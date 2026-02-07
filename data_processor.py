@@ -289,12 +289,16 @@ def build_period(leads, prev_leads=None):
                 tm[l["team_member"]]["booked"] += 1
             if l["marketing"] == "Yes":
                 tm[l["team_member"]]["mkt"] = True
-    team = sorted(
+    NON_TEAM_NAMES = {"insurance", "medicaid", "pending", "medicare"}
+    all_team = sorted(
         [{"name": n, "leads": d["leads"], "booked": d["booked"],
           "rate": round(d["booked"] / d["leads"] * 100) if d["leads"] else 0,
           "mkt": d["mkt"]} for n, d in tm.items() if d["leads"] >= 1],
         key=lambda x: -x["leads"]
-    )[:40]
+    )
+    team = [t for t in all_team if t["name"].lower() not in NON_TEAM_NAMES][:40]
+    referrals = [t for t in all_team if t["name"].lower() in {"insurance", "medicaid", "medicare"}]
+    pending = [t for t in all_team if t["name"].lower() == "pending"]
 
     # Revenue
     therapy_booked = sum(1 for l in leads if l["booked"] and not is_testing_service(l.get("service_raw", "")))
@@ -311,6 +315,8 @@ def build_period(leads, prev_leads=None):
         "locations": locations, "services": services, "problems": problems,
         "sources": sources, "outcomes": outcomes, "actions": actions,
         "marketing": marketing, "team": team,
+        "referrals": referrals,
+        "pending": pending,
         "revenue": {"therapyBooked": therapy_booked, "testingBooked": testing_booked,
                      "therapyTotal": therapy_total, "testingTotal": testing_total},
     }
@@ -402,6 +408,9 @@ def process_rental(rows):
         start_date = parse_date(row[0])
         if not start_date:
             continue
+        end_date = parse_date(row[1]) if len(row) > 1 else start_date
+        if not end_date:
+            end_date = start_date
         gt = parse_dollar(row[summary_cols.get("gt", 98)])
         if gt == 0:
             continue
@@ -416,6 +425,7 @@ def process_rental(rows):
             "total": int(gt), "cs": int(cs), "ftl": int(ftl), "pl": int(pl),
             "mkt": int(mkt), "testing": int(testing),
             "start_date": start_date,
+            "end_date": end_date,
         })
         for tc in therapist_cols:
             idx = tc["idx"]
@@ -430,13 +440,13 @@ def process_rental(rows):
     mon_map = defaultdict(lambda: {"gt": 0, "cs": 0, "ftl": 0, "pl": 0, "mkt": 0, "testing": 0, "weeks": 0})
     yr_map = defaultdict(lambda: {"gt": 0, "cs": 0, "ftl": 0, "pl": 0, "mkt": 0, "testing": 0})
     for w in weekly:
-        sd = w["start_date"]
-        m = sd.strftime("%Y-%m")
+        ed = w.get("end_date", w["start_date"])
+        m = ed.strftime("%Y-%m")
         mon_map[m]["gt"] += w["total"]; mon_map[m]["cs"] += w["cs"]
         mon_map[m]["ftl"] += w["ftl"]; mon_map[m]["pl"] += w["pl"]
         mon_map[m]["mkt"] += w["mkt"]; mon_map[m]["testing"] += w["testing"]
         mon_map[m]["weeks"] += 1
-        y = str(sd.year)
+        y = str(ed.year)
         yr_map[y]["gt"] += w["total"]; yr_map[y]["cs"] += w["cs"]
         yr_map[y]["ftl"] += w["ftl"]; yr_map[y]["pl"] += w["pl"]
         yr_map[y]["mkt"] += w["mkt"]; yr_map[y]["testing"] += w["testing"]
@@ -448,7 +458,10 @@ def process_rental(rows):
         [{"name": k[0], "col": k[1], "loc": k[2], "total": int(v)} for k, v in all_therapist_totals.items()],
         key=lambda x: -x["total"])[:40]
 
-    weekly_clean = [{k: v for k, v in w.items() if k != "start_date"} for w in weekly]
+    weekly_clean = [{k: v for k, v in w.items() if k not in ("start_date", "end_date")} for w in weekly]
+    # Last 52 weeks for chart
+    cutoff_52 = today - timedelta(weeks=52)
+    weekly_52 = [{k: v for k, v in w.items() if k not in ("start_date", "end_date")} for w in weekly if w["start_date"] >= cutoff_52]
 
     def period_summary(wdata):
         gt = sum(w["total"] for w in wdata)
@@ -485,17 +498,17 @@ def process_rental(rows):
             key=lambda x: -x["total"])[:n]
 
     today = date.today()
-    this_year = [w for w in weekly if w["start_date"].year == today.year]
-    last_year = [w for w in weekly if w["start_date"].year == today.year - 1]
-    this_month = [w for w in weekly if w["start_date"].year == today.year and w["start_date"].month == today.month]
+    this_year = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year]
+    last_year = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year - 1]
+    this_month = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year and w.get("end_date", w["start_date"]).month == today.month]
     lm = (date(today.year, today.month, 1) - timedelta(days=1))
-    last_month = [w for w in weekly if w["start_date"].year == lm.year and w["start_date"].month == lm.month]
+    last_month = [w for w in weekly if w.get("end_date", w["start_date"]).year == lm.year and w.get("end_date", w["start_date"]).month == lm.month]
     prev_ytd_end = date(today.year - 1, today.month, today.day)
-    prev_ytd = [w for w in weekly if w["start_date"].year == today.year - 1 and w["start_date"] <= prev_ytd_end]
-    prev_ly = [w for w in weekly if w["start_date"].year == today.year - 2]
+    prev_ytd = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year - 1 and w.get("end_date", w["start_date"]) <= prev_ytd_end]
+    prev_ly = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year - 2]
 
     return {
-        "weekly": weekly_clean, "monthly": rental_monthly, "yearly": rental_yearly,
+        "weekly": weekly_clean, "weekly52": weekly_52, "monthly": rental_monthly, "yearly": rental_yearly,
         "therapists": therapists_all,
         "allTime": period_summary(weekly),
         "ytd": period_summary(this_year),
