@@ -448,6 +448,28 @@ function BayviewDashboard() {
               </ChartCard>
             </div>
 
+            {/* Referral Tracking: Insurance & Medicaid */}
+            {(stats.referrals && stats.referrals.length > 0) && (
+              <ChartCard title="\u{1F4CB} Referred Out \u2014 Insurance & Medicaid" subtitle="Leads referred to insurance or medicaid providers" style={{ marginBottom: 16 }}>
+                <div style={{ maxHeight: 300, overflowY: "auto", paddingRight: 8 }}>
+                  {stats.referrals.map((member, i) => (
+                    <RankRow key={member.name} rank={i + 1} name={member.name} count={member.leads} booked={member.booked} rate={member.rate} max={stats.referrals[0]?.leads || 1} color="#EAB308" />
+                  ))}
+                </div>
+              </ChartCard>
+            )}
+
+            {/* Pending Leads */}
+            {(stats.pending && stats.pending.length > 0) && (
+              <ChartCard title="\u23F3 Pending" subtitle="Leads still awaiting assignment" style={{ marginBottom: 16 }}>
+                <div style={{ maxHeight: 200, overflowY: "auto", paddingRight: 8 }}>
+                  {stats.pending.map((member, i) => (
+                    <RankRow key={member.name} rank={i + 1} name={member.name} count={member.leads} booked={member.booked} rate={member.rate} max={stats.pending[0]?.leads || 1} color="#6B7280" />
+                  ))}
+                </div>
+              </ChartCard>
+            )}
+
             {/* Therapist Financial Cards */}
             <ChartCard title="💰 Therapist Revenue & Acquisition" subtitle={`$${COST_PER_LEAD}/lead acquisition · $${REVENUE_PER_BOOKED}/booked client revenue`}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginTop: 8 }}>
@@ -653,7 +675,7 @@ function BayviewDashboard() {
             {/* Weekly Revenue Chart */}
             <ChartCard title="Weekly Room Rental Revenue" subtitle="Last 52 weeks — revenue by location" style={{ marginBottom: 16 }}>
               <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={R.weekly || []}>
+                <BarChart data={R.weekly52 || R.weekly || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
                   <XAxis dataKey="week" tick={{ fontSize: 8, fill: C.textMuted }} axisLine={false} tickLine={false} tickFormatter={d => { const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }} interval={3} />
                   <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
