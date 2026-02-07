@@ -461,8 +461,7 @@ def process_rental(rows):
     weekly_clean = [{k: v for k, v in w.items() if k not in ("start_date", "end_date")} for w in weekly]
     # Last 52 weeks for chart
     today = date.today()
-    cutoff_52
-    = today - timedelta(weeks=52)
+    cutoff_52 = today - timedelta(weeks=52)
     weekly_52 = [{k: v for k, v in w.items() if k not in ("start_date", "end_date")} for w in weekly if w["start_date"] >= cutoff_52]
 
     def period_summary(wdata):
