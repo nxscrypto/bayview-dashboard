@@ -28,9 +28,9 @@ app = Flask(__name__, static_folder="static")
 # In-memory data cache
 # ──────────────────────────────────────────────────────────────────────────────
 _data_lock = threading.Lock()
-_cached_data = None           # dict
-_cached_json = None           # pre-serialized JSON string
-_last_refresh = None          # datetime
+_cached_data = None
+_cached_json = None
+_last_refresh = None
 
 REFRESH_MINUTES = int(os.environ.get("REFRESH_MINUTES", "15"))
 
@@ -38,7 +38,7 @@ REFRESH_MINUTES = int(os.environ.get("REFRESH_MINUTES", "15"))
 def refresh_data():
     """Fetch fresh data from Google Sheets and update the cache."""
     global _cached_data, _cached_json, _last_refresh
-    logger.info("⟳  Refreshing data from Google Sheets …")
+    logger.info("Refreshing data from Google Sheets...")
     try:
         data = generate_data()
         json_str = json.dumps(data, separators=(",", ":"))
@@ -46,10 +46,10 @@ def refresh_data():
             _cached_data = data
             _cached_json = json_str
             _last_refresh = datetime.now()
-        logger.info("✓  Data refreshed — %d bytes, %s leads",
+        logger.info("Data refreshed — %d bytes, %s leads",
                      len(json_str), data.get("all", {}).get("total", "?"))
     except Exception:
-        logger.exception("✗  Data refresh failed")
+        logger.exception("Data refresh failed")
 
 
 def get_data():
@@ -60,7 +60,7 @@ def get_data():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Background scheduler — auto-refresh every N minutes
+# Background scheduler
 # ──────────────────────────────────────────────────────────────────────────────
 scheduler = BackgroundScheduler(daemon=True)
 scheduler.add_job(refresh_data, "interval", minutes=REFRESH_MINUTES,
@@ -73,13 +73,11 @@ scheduler.add_job(refresh_data, "interval", minutes=REFRESH_MINUTES,
 
 @app.route("/")
 def index():
-    """Serve the dashboard."""
     return send_from_directory(app.static_folder, "index.html")
 
 
 @app.route("/api/data")
 def api_data():
-    """Return the precomputed dashboard JSON."""
     data_json, refreshed = get_data()
     if data_json is None:
         return jsonify({"error": "Data not yet available, try again shortly"}), 503
@@ -91,14 +89,12 @@ def api_data():
 
 @app.route("/api/refresh", methods=["POST"])
 def api_refresh():
-    """Manually trigger a data refresh."""
     refresh_data()
     return jsonify({"ok": True, "refreshed": _last_refresh.isoformat() if _last_refresh else None})
 
 
 @app.route("/api/status")
 def api_status():
-    """Health check."""
     return jsonify({
         "status": "ok",
         "last_refresh": _last_refresh.isoformat() if _last_refresh else None,
@@ -108,12 +104,12 @@ def api_status():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Startup — runs on import (when gunicorn loads app:app)
+# Startup — runs when gunicorn imports this module
 # ──────────────────────────────────────────────────────────────────────────────
-logger.info("🚀 Starting Bayview Dashboard — loading initial data…")
+logger.info("Starting Bayview Dashboard...")
 refresh_data()
 scheduler.start()
-logger.info("✓  Scheduler started — refreshing every %d minutes", REFRESH_MINUTES)
+logger.info("Scheduler started — refreshing every %d minutes", REFRESH_MINUTES)
 
 
 if __name__ == "__main__":
