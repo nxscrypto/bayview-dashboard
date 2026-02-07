@@ -48,9 +48,12 @@ def parse_date(s: str):
     if not s or not s.strip():
         return None
     s = s.strip()
-    for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%m/%d/%y"):
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
         try:
-            return datetime.strptime(s, fmt).date()
+            dt = datetime.strptime(s, fmt).date()
+            if 2017 <= dt.year <= date.today().year + 1:
+                return dt
+            return None
         except ValueError:
             continue
     return None
@@ -620,7 +623,7 @@ def generate_data() -> dict:
     logger.info("Processed %d leads", len(all_leads))
 
     # Slice by period
-    ytd       = [l for l in all_leads if l["date"] >= year_start]
+    ytd       = [l for l in all_leads if year_start <= l["date"] <= today]
     lastyear  = [l for l in all_leads if ly_start <= l["date"] <= ly_end]
     month     = [l for l in all_leads if l["date"] >= month_start]
     week      = [l for l in all_leads if l["date"] >= week_start]
