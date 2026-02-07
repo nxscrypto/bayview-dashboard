@@ -91,7 +91,7 @@ def _do_refresh():
 
 
 def _ensure_loaded():
-    global _loading
+    global _data_json, _data_dict, _last_refresh, _loading
     with _lock:
         if _data_json is not None or _loading:
             return
@@ -101,7 +101,6 @@ def _ensure_loaded():
     cached, ts = _load_redis()
     if cached:
         with _lock:
-            global _data_json, _data_dict, _last_refresh
             _data_json = cached
             _data_dict = json.loads(cached)
             _last_refresh = datetime.fromisoformat(ts) if ts else datetime.now()
@@ -162,5 +161,5 @@ scheduler.start()
 _ensure_loaded()
 
 if __name__ == "__main__":
-    _do_refresh()  # block on direct run only
+    _do_refresh()
     app.run(host="0.0.0.0", port=port, debug=False)
