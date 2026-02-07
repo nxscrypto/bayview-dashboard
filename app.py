@@ -1,6 +1,5 @@
 """
 app.py — Bayview Counseling Lead Dashboard
-Uses Redis to cache data so restarts are instant.
 """
 
 import json
@@ -12,157 +11,156 @@ from datetime import datetime
 from flask import Flask, jsonify, send_from_directory
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from data_processor import generate_data
-
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("bayview")
 
 app = Flask(__name__, static_folder="static")
 
-# ── Redis setup ──────────────────────────────────────────────────────────────
-_redis = None
-REDIS_KEY = "bayview:dashboard_data"
-REDIS_TS_KEY = "bayview:last_refresh"
-
-def get_redis():
-    global _redis
-    if _redis is None:
-        redis_url = os.environ.get("REDIS_URL")
-        if redis_url:
-            try:
-                import redis
-                _redis = redis.from_url(redis_url, decode_responses=True)
-                _redis.ping()
-                logger.info("Redis connected")
-            except Exception as e:
-                logger.warning("Redis not available: %s", e)
-                _redis = False  # Mark as unavailable
-        else:
-            _redis = False
-    return _redis if _redis else None
-
-
-# ── In-memory cache ──────────────────────────────────────────────────────────
-_data_lock = threading.Lock()
-_cached_data = None
-_cached_json = None
+# ── State ────────────────────────────────────────────────────────────────────
+_lock = threading.Lock()
+_data_json = None
+_data_dict = None
 _last_refresh = None
-_initial_load_started = False
+_loading = False
 
 REFRESH_MINUTES = int(os.environ.get("REFRESH_MINUTES", "15"))
 
 
-def save_to_redis(json_str):
-    r = get_redis()
-    if r:
-        try:
-            r.set(REDIS_KEY, json_str)
-            r.set(REDIS_TS_KEY, datetime.now().isoformat())
-            logger.info("Saved to Redis cache")
-        except Exception as e:
-            logger.warning("Redis save failed: %s", e)
+# ── Redis helpers ────────────────────────────────────────────────────────────
+def _get_redis():
+    url = os.environ.get("REDIS_URL")
+    if not url:
+        logger.info("No REDIS_URL set")
+        return None
+    try:
+        import redis as r
+        client = r.from_url(url, decode_responses=True, socket_timeout=5)
+        client.ping()
+        return client
+    except Exception as e:
+        logger.warning("Redis unavailable: %s", e)
+        return None
 
 
-def load_from_redis():
-    r = get_redis()
-    if r:
-        try:
-            data = r.get(REDIS_KEY)
-            ts = r.get(REDIS_TS_KEY)
+def _save_redis(json_str):
+    try:
+        client = _get_redis()
+        if client:
+            client.set("bayview:data", json_str)
+            client.set("bayview:ts", datetime.now().isoformat())
+            logger.info("Saved %d bytes to Redis", len(json_str))
+    except Exception as e:
+        logger.warning("Redis save error: %s", e)
+
+
+def _load_redis():
+    try:
+        client = _get_redis()
+        if client:
+            data = client.get("bayview:data")
+            ts = client.get("bayview:ts")
             if data:
-                logger.info("Loaded from Redis cache (%d bytes)", len(data))
+                logger.info("Loaded %d bytes from Redis", len(data))
                 return data, ts
-        except Exception as e:
-            logger.warning("Redis load failed: %s", e)
+    except Exception as e:
+        logger.warning("Redis load error: %s", e)
     return None, None
 
 
-def refresh_data():
-    global _cached_data, _cached_json, _last_refresh
-    logger.info("Refreshing data from Google Sheets...")
+# ── Data loading ─────────────────────────────────────────────────────────────
+def _do_refresh():
+    global _data_json, _data_dict, _last_refresh, _loading
+    logger.info("Fetching data from Google Sheets...")
     try:
+        from data_processor import generate_data
         data = generate_data()
-        json_str = json.dumps(data, separators=(",", ":"))
-        with _data_lock:
-            _cached_data = data
-            _cached_json = json_str
+        js = json.dumps(data, separators=(",", ":"))
+        with _lock:
+            _data_json = js
+            _data_dict = data
             _last_refresh = datetime.now()
-        save_to_redis(json_str)
-        logger.info("Data refreshed — %d bytes", len(json_str))
+            _loading = False
+        _save_redis(js)
+        logger.info("Data ready — %d bytes, %s leads",
+                     len(js), data.get("all", {}).get("total", "?"))
     except Exception:
-        logger.exception("Data refresh failed")
+        logger.exception("Refresh failed")
+        with _lock:
+            _loading = False
 
 
-def ensure_data_loaded():
-    global _cached_json, _cached_data, _last_refresh, _initial_load_started
-    if _cached_json is not None:
-        return
-    if not _initial_load_started:
-        _initial_load_started = True
-        # Try Redis first (instant)
-        cached, ts = load_from_redis()
-        if cached:
-            with _data_lock:
-                _cached_json = cached
-                _cached_data = json.loads(cached)
-                _last_refresh = datetime.fromisoformat(ts) if ts else datetime.now()
-            # Still refresh from Sheets in background
-            threading.Thread(target=refresh_data, daemon=True).start()
+def _ensure_loaded():
+    global _loading
+    with _lock:
+        if _data_json is not None or _loading:
             return
-        # No Redis cache, fetch from Sheets in background
-        threading.Thread(target=refresh_data, daemon=True).start()
+        _loading = True
 
+    # Try Redis first
+    cached, ts = _load_redis()
+    if cached:
+        with _lock:
+            global _data_json, _data_dict, _last_refresh
+            _data_json = cached
+            _data_dict = json.loads(cached)
+            _last_refresh = datetime.fromisoformat(ts) if ts else datetime.now()
+            _loading = False
+        logger.info("Serving from Redis cache")
+        # Still refresh in background
+        threading.Thread(target=_do_refresh, daemon=True).start()
+        return
 
-# ── Background scheduler ────────────────────────────────────────────────────
-scheduler = BackgroundScheduler(daemon=True)
-scheduler.add_job(refresh_data, "interval", minutes=REFRESH_MINUTES,
-                  id="refresh", replace_existing=True)
+    # No cache — fetch in background
+    threading.Thread(target=_do_refresh, daemon=True).start()
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
-
 @app.route("/")
 def index():
-    ensure_data_loaded()
+    _ensure_loaded()
     return send_from_directory(app.static_folder, "index.html")
 
 
 @app.route("/api/data")
 def api_data():
-    ensure_data_loaded()
-    if _cached_json is None:
-        return jsonify({"error": "Data loading, please refresh in a few seconds"}), 503
-    resp = app.response_class(response=_cached_json, status=200, mimetype="application/json")
-    resp.headers["X-Last-Refresh"] = _last_refresh.isoformat() if _last_refresh else "never"
+    _ensure_loaded()
+    with _lock:
+        js = _data_json
+        ts = _last_refresh
+
+    if js is None:
+        return jsonify({"error": "Still loading data, retry in a few seconds"}), 503
+
+    resp = app.response_class(response=js, status=200, mimetype="application/json")
+    resp.headers["X-Last-Refresh"] = ts.isoformat() if ts else "never"
     resp.headers["Cache-Control"] = "public, max-age=60"
     return resp
 
 
 @app.route("/api/refresh", methods=["POST"])
 def api_refresh():
-    refresh_data()
+    threading.Thread(target=_do_refresh, daemon=True).start()
     return jsonify({"ok": True, "refreshed": _last_refresh.isoformat() if _last_refresh else None})
 
 
 @app.route("/api/status")
 def api_status():
-    return jsonify({
-        "status": "ok",
-        "last_refresh": _last_refresh.isoformat() if _last_refresh else None,
-        "total_leads": _cached_data.get("all", {}).get("total") if _cached_data else None,
-        "refresh_interval_minutes": REFRESH_MINUTES,
-    })
+    return jsonify({"status": "ok", "loaded": _data_json is not None})
 
 
 # ── Startup ──────────────────────────────────────────────────────────────────
-scheduler.start()
-logger.info("Bayview Dashboard started — scheduler every %d min", REFRESH_MINUTES)
-# Pre-load from Redis on startup
-ensure_data_loaded()
+port = int(os.environ.get("PORT", 8080))
+logger.info("Starting on port %d", port)
 
+scheduler = BackgroundScheduler(daemon=True)
+scheduler.add_job(_do_refresh, "interval", minutes=REFRESH_MINUTES,
+                  id="refresh", replace_existing=True)
+scheduler.start()
+
+# Pre-load from Redis (non-blocking)
+_ensure_loaded()
 
 if __name__ == "__main__":
-    refresh_data()
-    port = int(os.environ.get("PORT", 5000))
+    _do_refresh()  # block on direct run only
     app.run(host="0.0.0.0", port=port, debug=False)
