@@ -758,7 +758,7 @@ function BayviewDashboard() {
             {activeTab === "intake" && (
               <div>
                 {/* ── Intake Form ── */}
-                <Card title="\u{1F4CB} New Lead Intake" subtitle="Enter new lead information" style={{marginBottom: 24}}>
+                <ChartCard title="\u{1F4CB} New Lead Intake" subtitle="Enter new lead information" style={{marginBottom: 24}}>
                   {intakeMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: intakeMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: intakeMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{intakeMsg.text}</div>}
                   <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:12}}>
                     <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Date *</label><input type="date" value={intakeForm.date} onChange={e => setIntakeForm({...intakeForm, date: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
@@ -777,10 +777,10 @@ function BayviewDashboard() {
                   </div>
                   <div style={{marginTop:12}}><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Notes</label><textarea value={intakeForm.notes} onChange={e => setIntakeForm({...intakeForm, notes: e.target.value})} rows={2} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13, resize:"vertical"}} /></div>
                   <button onClick={submitLead} style={{marginTop:16, padding:"10px 32px", background:C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:700, fontSize:14, cursor:"pointer"}}>Submit Lead</button>
-                </Card>
+                </ChartCard>
 
                 {/* ── Pending Leads Manager ── */}
-                <Card title="\u{23F3} Pending Leads" subtitle={"Leads awaiting therapist assignment or booking confirmation (last 14 days) \u00B7 " + pendingLeads.length + " pending"}>
+                <ChartCard title="\u{23F3} Pending Leads" subtitle={"Leads awaiting therapist assignment or booking confirmation (last 14 days) \u00B7 " + pendingLeads.length + " pending"}>
                   {loadingPending ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>Loading...</div> :
                   pendingLeads.length === 0 ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>No pending leads in the last 14 days</div> :
                   <div style={{overflowX:"auto"}}>
@@ -812,7 +812,7 @@ function BayviewDashboard() {
                       })}</tbody>
                     </table>
                   </div>}
-                </Card>
+                </ChartCard>
               </div>
             )}
 
