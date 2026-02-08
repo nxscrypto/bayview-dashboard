@@ -149,6 +149,12 @@ def get_lead(lead_id):
     return dict(row) if row else None
 
 
+def delete_lead(lead_id):
+    with get_db() as conn:
+        conn.execute("DELETE FROM leads WHERE id = ?", (lead_id,))
+    return True
+
+
 def get_leads_for_dashboard():
     """Return leads in a format compatible with the Google Sheet CSV structure."""
     with get_db() as conn:
