@@ -8,7 +8,7 @@ import logging
 import threading
 from datetime import datetime
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 from apscheduler.schedulers.background import BackgroundScheduler
 
 logging.basicConfig(level=logging.INFO,
@@ -16,6 +16,10 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("bayview")
 
 app = Flask(__name__, static_folder="static")
+
+# ── Database ─────────────────────────────────────────────────────────────────
+from database import init_db, add_lead, update_lead, get_pending_leads, get_lead
+init_db()
 
 # ── State ────────────────────────────────────────────────────────────────────
 _lock = threading.Lock()
@@ -146,6 +150,51 @@ def api_refresh():
 @app.route("/api/status")
 def api_status():
     return jsonify({"status": "ok", "loaded": _data_json is not None})
+
+
+
+# ── Lead API ─────────────────────────────────────────────────────────────────
+@app.route("/api/leads", methods=["POST"])
+def api_add_lead():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    required = ["date", "location", "first_name", "last_name", "phone",
+                 "service_type", "presenting_problem", "referral_source",
+                 "action_taken", "referred_to", "referral_outcome"]
+    missing = [f for f in required if not data.get(f)]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+    lead_id = add_lead(data)
+    return jsonify({"ok": True, "id": lead_id}), 201
+
+
+@app.route("/api/leads/pending")
+def api_pending_leads():
+    days = request.args.get("days", 14, type=int)
+    leads = get_pending_leads(days)
+    return jsonify(leads)
+
+
+@app.route("/api/leads/<int:lead_id>", methods=["PUT"])
+def api_update_lead(lead_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    lead = get_lead(lead_id)
+    if not lead:
+        return jsonify({"error": "Lead not found"}), 404
+    update_lead(lead_id, data)
+    updated = get_lead(lead_id)
+    return jsonify({"ok": True, "lead": updated})
+
+
+@app.route("/api/leads/<int:lead_id>")
+def api_get_lead(lead_id):
+    lead = get_lead(lead_id)
+    if not lead:
+        return jsonify({"error": "Lead not found"}), 404
+    return jsonify(lead)
 
 
 # ── Startup ──────────────────────────────────────────────────────────────────
