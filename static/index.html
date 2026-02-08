@@ -145,7 +145,6 @@ const RankRow = ({ rank, name, count, max, color, booked, rate, cost, revenue })
 
 function BayviewDashboard() {
   const [timeFilter, setTimeFilter] = useState("month");
-  const [rentalPeriod, setRentalPeriod] = useState("ytd");
   const [activeTab, setActiveTab] = useState("overview");
 
   const tabs = [
@@ -445,7 +444,9 @@ function BayviewDashboard() {
         {/* ═══ ROOM RENTAL TAB ═══ */}
         {activeTab === "rental" && (() => {
           const R = PRECOMPUTED._rental || {};
-          const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth };
+            const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth };
+            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", week: "thisMonth", today: "thisMonth", all: "allTime", lastyear: "lastYear" };
+            const rentalPeriod = rentalPeriodMap[timeFilter] || "ytd";
           const rp = periods[rentalPeriod] || R.allTime || {};
           const rpTherapists = rentalPeriod === "ytd" ? R.ytdTherapists : rentalPeriod === "lastYear" ? R.lyTherapists : rentalPeriod === "thisMonth" ? R.thisMonthTherapists : R.therapists;
           const prevPeriod = rentalPeriod === "ytd" ? R.prevYtd : rentalPeriod === "thisMonth" ? R.lastMonth : rentalPeriod === "lastYear" ? R.prevLy : null;
@@ -465,22 +466,9 @@ function BayviewDashboard() {
             { name: "Testing", value: rp.testing || 0 },
           ].filter(d => d.value > 0);
 
-          const rentalBtns = [
-            { id: "ytd", label: "YTD" },
-            { id: "thisMonth", label: "This Month" },
-            { id: "lastMonth", label: "Last Month" },
-            { id: "lastYear", label: "2025" },
-            { id: "allTime", label: "All Time" },
-          ];
 
           return (
           <>
-            {/* Period toggle */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
-              {rentalBtns.map(b => (
-                <button key={b.id} onClick={() => setRentalPeriod(b.id)} style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${rentalPeriod === b.id ? C.accent : C.border}`, background: rentalPeriod === b.id ? `${C.accent}15` : "transparent", color: rentalPeriod === b.id ? C.accent : C.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{b.label}</button>
-              ))}
-            </div>
 
             {/* KPIs */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16, marginBottom: 24 }}>
@@ -571,7 +559,7 @@ function BayviewDashboard() {
             )}
 
             {/* Top Therapists */}
-            <ChartCard title="🏆 Top Therapists by Room Rental Revenue" subtitle={`${rentalBtns.find(b => b.id === rentalPeriod)?.label || ''} — sorted by total revenue`}>
+            <ChartCard title="🏆 Top Therapists by Room Rental Revenue" subtitle={`${rentalPeriod === "ytd" ? "YTD" : rentalPeriod === "thisMonth" ? "This Month" : rentalPeriod === "lastYear" ? "Last Year" : "All Time"} — sorted by total revenue`}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10, marginTop: 8 }}>
                 {(rpTherapists || []).slice(0, 24).map((t, i) => {
                   const maxVal = (rpTherapists || [])[0]?.total || 1;
