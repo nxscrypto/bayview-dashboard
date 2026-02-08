@@ -118,7 +118,7 @@ def get_pending_leads(days=14):
     with get_db() as conn:
         rows = conn.execute("""
             SELECT * FROM leads
-            WHERE (referred_to = 'Pending' OR referral_outcome IN ('Called', 'Emailed', 'Left Message'))
+            WHERE (referred_to = 'Pending' OR action_taken = 'Pending' OR referral_outcome IN ('Called', 'Emailed', 'Left Message', 'Pending'))
               AND date >= ?
             ORDER BY date DESC, created_at DESC
         """, (cutoff,)).fetchall()
