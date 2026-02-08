@@ -18,7 +18,7 @@ logger = logging.getLogger("bayview")
 app = Flask(__name__, static_folder="static")
 
 # ── Database ─────────────────────────────────────────────────────────────────
-from database import init_db, add_lead, update_lead, get_pending_leads, get_lead
+from database import init_db, add_lead, update_lead, get_pending_leads, get_recent_leads, get_lead
 init_db()
 
 # ── State ────────────────────────────────────────────────────────────────────
@@ -175,6 +175,13 @@ def api_pending_leads():
     leads = get_pending_leads(days)
     return jsonify(leads)
 
+
+
+@app.route("/api/leads/recent")
+def api_recent_leads():
+    days = request.args.get("days", 30, type=int)
+    leads = get_recent_leads(days)
+    return jsonify(leads)
 
 @app.route("/api/leads/<int:lead_id>", methods=["PUT"])
 def api_update_lead(lead_id):
