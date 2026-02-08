@@ -466,9 +466,10 @@ def process_rental(rows):
     rental_monthly = [{"month": k, **v} for k, v in sorted(mon_map.items())]
     rental_yearly = [{"year": k, **v} for k, v in sorted(yr_map.items())]
 
-    therapists_all = sorted(
-        [{"name": k[0], "col": k[1], "loc": k[2], "total": int(v)} for k, v in all_therapist_totals.items()],
-        key=lambda x: -x["total"])[:40]
+    all_entries = [{"name": k[0], "col": k[1], "loc": k[2], "total": int(v)} for k, v in all_therapist_totals.items()]
+    therapists_all = sorted([e for e in all_entries if e["loc"] not in ("MKT", "Testing")], key=lambda x: -x["total"])[:60]
+    mkt_therapists_all = sorted([e for e in all_entries if e["loc"] == "MKT"], key=lambda x: -x["total"])
+    test_therapists_all = sorted([e for e in all_entries if e["loc"] == "Testing"], key=lambda x: -x["total"])
 
     weekly_clean = [{k: v for k, v in w.items() if k not in ("start_date", "end_date")} for w in weekly]
     # Last 52 weeks for chart
@@ -488,7 +489,7 @@ def process_rental(rows):
                 "mkt": int(mkt), "testing": int(testing), "weeks": weeks,
                 "avgWeek": int(gt / weeks) if weeks else 0}
 
-    def period_therapists(wdata, n=40):
+    def period_therapists(wdata, n=60, loc_filter=None):
         dates = {w["start_date"] for w in wdata if "start_date" in w}
         totals = defaultdict(float)
         for row in rows[1:]:
@@ -501,6 +502,10 @@ def process_rental(rows):
             if gt == 0:
                 continue
             for tc in therapist_cols:
+                if loc_filter and tc["loc"] not in loc_filter:
+                    continue
+                if loc_filter is None and tc["loc"] in ("MKT", "Testing"):
+                    continue
                 idx = tc["idx"]
                 if idx < len(row):
                     val = parse_dollar(row[idx])
@@ -523,6 +528,8 @@ def process_rental(rows):
     return {
         "weekly": weekly_clean, "weekly52": weekly_52, "monthly": rental_monthly, "yearly": rental_yearly,
         "therapists": therapists_all,
+        "mktTherapists": mkt_therapists_all,
+        "testTherapists": test_therapists_all,
         "allTime": period_summary(weekly),
         "ytd": period_summary(this_year),
         "lastYear": period_summary(last_year),
@@ -534,6 +541,12 @@ def process_rental(rows):
         "lyTherapists": period_therapists(last_year),
         "thisMonthTherapists": period_therapists(this_month),
         "lastMonthTherapists": period_therapists(last_month),
+        "mktYtdTherapists": period_therapists(this_year, loc_filter=["MKT"]),
+        "mktLyTherapists": period_therapists(last_year, loc_filter=["MKT"]),
+        "mktThisMonthTherapists": period_therapists(this_month, loc_filter=["MKT"]),
+        "testYtdTherapists": period_therapists(this_year, loc_filter=["Testing"]),
+        "testLyTherapists": period_therapists(last_year, loc_filter=["Testing"]),
+        "testThisMonthTherapists": period_therapists(this_month, loc_filter=["Testing"]),
     }
 
 
