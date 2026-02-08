@@ -404,39 +404,60 @@ function BayviewDashboard() {
           )}
 
 
-        {/* ═══ TEAM TAB ═══ */}
-        {activeTab === "team" && (
-          <>
-            {/* Financial Summary Bar */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 22px", marginBottom: 16, display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>💰 Financial Summary</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 11, color: C.textMuted }}>Acquisition Cost</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: C.rose }}>{fmtCurrency(totalAcq)}</span>
-                <span style={{ fontSize: 10, color: C.textDim }}>({stats.team.reduce((s,t)=>s+t.leads,0).toLocaleString()} leads × ${COST_PER_LEAD})</span>
-              </div>
-              <div style={{ width: 1, height: 24, background: C.border }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 11, color: C.textMuted }}>Est. Revenue</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: C.accent }}>{fmtCurrency(totalRev)}</span>
-                <span style={{ fontSize: 10, color: C.textDim }}>({stats.team.reduce((s,t)=>s+t.booked,0).toLocaleString()} booked × ${REVENUE_PER_BOOKED})</span>
-              </div>
-              <div style={{ width: 1, height: 24, background: C.border }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 11, color: C.textMuted }}>Net Profit</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: totalRev - totalAcq >= 0 ? C.accent : C.rose }}>{fmtCurrency(totalRev - totalAcq)}</span>
-              </div>
-            </div>
 
+          {/* ═══ TEAM TAB ═══ */}
+          {activeTab === "team" && (() => {
+            const allTimeStats = PRECOMPUTED.all || {};
+            const weekStats = PRECOMPUTED.week || {};
+            const allTeam = allTimeStats.team || [];
+            const weekTeam = weekStats.team || [];
+            const weekMap = {};
+            weekTeam.forEach(t => { weekMap[t.name] = t; });
+
+            // Marketing analysis
+            const mktMembers = stats.team.filter(t => t.mkt);
+            const nonMktMembers = stats.team.filter(t => !t.mkt);
+            const mktAvgRate = mktMembers.length > 0 ? Math.round(mktMembers.reduce((s, t) => s + t.rate, 0) / mktMembers.length) : 0;
+            const nonMktAvgRate = nonMktMembers.length > 0 ? Math.round(nonMktMembers.reduce((s, t) => s + t.rate, 0) / nonMktMembers.length) : 0;
+            const mktTotalLeads = mktMembers.reduce((s, t) => s + t.leads, 0);
+            const nonMktTotalLeads = nonMktMembers.reduce((s, t) => s + t.leads, 0);
+
+            // Rising stars: therapists whose week rate > all-time rate AND have recent activity
+            const risers = stats.team.filter(t => t.leads >= 1).map(t => {
+              const allTime = allTeam.find(a => a.name === t.name);
+              const wk = weekMap[t.name];
+              return {
+                ...t,
+                allRate: allTime?.rate || 0,
+                allLeads: allTime?.leads || 0,
+                weekLeads: wk?.leads || 0,
+                weekBooked: wk?.booked || 0,
+                weekRate: wk?.rate || 0,
+                rateChange: (wk?.rate || 0) - (allTime?.rate || 0),
+                isNew: (allTime?.leads || 0) < 30,
+              };
+            });
+
+            // Conversion concerns: high leads but low rate
+            const concerns = stats.team.filter(t => t.leads >= 3 && t.rate < 40).sort((a, b) => b.leads - a.leads);
+
+            // Up-and-comers: rising rate this week vs all-time
+            const upAndComers = risers.filter(t => t.weekLeads >= 1 && t.rateChange > 0).sort((a, b) => b.rateChange - a.rateChange);
+
+            // Non-mkt benefiting most (getting leads without paying for marketing)
+            const nonMktBenefiting = stats.team.filter(t => !t.mkt && t.leads > 0).sort((a, b) => b.leads - a.leads);
+
+            return (
+            <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
               <StatCard label="Top Performer" value={stats.team[0]?.name || "—"} icon="🏆" color="#FFD700" sub={`${stats.team[0]?.leads || 0} leads received`} />
               <StatCard label="Best Conversion" value={(stats.team.filter(t => t.leads >= 5).sort((a, b) => b.rate - a.rate)[0])?.name || "—"} icon="🎯" color={C.accent} sub={`${(stats.team.filter(t => t.leads >= 5).sort((a, b) => b.rate - a.rate)[0])?.rate || 0}% booking rate`} />
-              <StatCard label="Highest Revenue" value={(teamWithFinancials.sort((a, b) => b.estRevenue - a.estRevenue)[0])?.name || "—"} icon="💰" color={C.warm} sub={fmtCurrency(teamWithFinancials.sort((a, b) => b.estRevenue - a.estRevenue)[0]?.estRevenue || 0)} />
-              <StatCard label="Best ROI" value={(teamWithFinancials.filter(t => t.leads >= 5).sort((a, b) => b.roi - a.roi)[0])?.name || "—"} icon="📈" color={C.purple} sub={`${(teamWithFinancials.filter(t => t.leads >= 5).sort((a, b) => b.roi - a.roi)[0])?.roi || 0}% return`} />
+              <StatCard label="Needs Attention" value={concerns[0]?.name || "—"} icon="⚠️" color={C.rose} sub={concerns[0] ? `${concerns[0].leads} leads · ${concerns[0].rate}% conversion` : "All good"} />
+              <StatCard label="Rising Star" value={upAndComers[0]?.name || "—"} icon="🚀" color={C.warm} sub={upAndComers[0] ? `+${upAndComers[0].rateChange}% vs all-time avg` : "No trending data"} />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-              <ChartCard title="🏆 Team Lead Rankings" subtitle="Sorted by leads received — top 25">
+              <ChartCard title="🏅 Team Lead Rankings" subtitle="Sorted by leads received — top 25">
                 <div style={{ maxHeight: 500, overflowY: "auto", paddingRight: 8 }}>
                   {stats.team.slice(0, 25).map((member, i) => (
                     <RankRow key={member.name} rank={i + 1} name={member.name} count={member.leads} booked={member.booked} rate={member.rate} max={stats.team[0]?.leads || 1} color={i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : C.accent} />
@@ -456,6 +477,127 @@ function BayviewDashboard() {
                     <Bar dataKey="booked" name="Booked" fill={C.accent} radius={[0, 4, 4, 0]} barSize={12} />
                   </BarChart>
                 </ResponsiveContainer>
+              </ChartCard>
+            </div>
+
+            {/* Therapist Revenue & Acquisition */}
+            <ChartCard title="💰 Therapist Revenue & Acquisition" subtitle={`$${COST_PER_LEAD}/lead acquisition · $${REVENUE_PER_BOOKED}/booked client revenue`} style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginTop: 8 }}>
+                {teamWithFinancials.slice(0, 20).map((t) => (
+                  <div key={t.name} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: t.profit >= 0 ? C.accent : C.rose, opacity: 0.6 }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{t.name}{t.mkt && <span title="Marketing Program" style={{ marginLeft: 6, fontSize: 12 }}>📣</span>}</div>
+                      <div style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: t.rate >= 70 ? `${C.accent}20` : t.rate >= 50 ? `${C.warm}20` : `${C.rose}20`, color: t.rate >= 70 ? C.accent : t.rate >= 50 ? C.warm : C.rose }}>{t.rate}% booked</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+                      <div><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>Leads</div><div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{t.leads.toLocaleString()}</div></div>
+                      <div><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>Booked</div><div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>{t.booked.toLocaleString()}</div></div>
+                      <div style={{ marginLeft: "auto", textAlign: "right" }}><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>ROI</div><div style={{ fontSize: 16, fontWeight: 700, color: t.roi >= 0 ? C.accent : C.rose }}>{t.roi}%</div></div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: C.rose }}><span style={{ color: C.textMuted }}>Cost: </span>{fmtCurrency(t.acqCost)}</div>
+                      <div style={{ fontSize: 11, color: C.accent }}><span style={{ color: C.textMuted }}>Revenue: </span>{fmtCurrency(t.estRevenue)}</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: t.profit >= 0 ? C.accent : C.rose }}>{t.profit >= 0 ? "+" : ""}{fmtCurrency(t.profit)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ChartCard>
+
+            {/* Marketing Intelligence */}
+            <ChartCard title="📣 Marketing Intelligence" subtitle={`${mktMembers.length} on program · ${nonMktMembers.length} not enrolled — who\'s benefiting without paying?`} style={{ marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 8 }}>
+                {/* Summary Stats */}
+                <div style={{ background: C.bg, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>🟢 Marketing Members</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div><div style={{ fontSize: 10, color: C.textDim }}>MEMBERS</div><div style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{mktMembers.length}</div></div>
+                    <div><div style={{ fontSize: 10, color: C.textDim }}>TOTAL LEADS</div><div style={{ fontSize: 20, fontWeight: 800, color: C.blue }}>{mktTotalLeads.toLocaleString()}</div></div>
+                    <div><div style={{ fontSize: 10, color: C.textDim }}>AVG RATE</div><div style={{ fontSize: 20, fontWeight: 800, color: C.accent }}>{mktAvgRate}%</div></div>
+                  </div>
+                  <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                    {mktMembers.sort((a,b) => b.leads - a.leads).slice(0, 10).map(t => (
+                      <div key={t.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+                        <span style={{ fontSize: 12, color: C.text }}>{t.name}</span>
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: C.textMuted }}>{t.leads} leads</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: t.rate >= 60 ? C.accent : t.rate >= 40 ? C.warm : C.rose }}>{t.rate}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ background: C.bg, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.warm, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>🟠 Not on Marketing</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div><div style={{ fontSize: 10, color: C.textDim }}>MEMBERS</div><div style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{nonMktMembers.length}</div></div>
+                    <div><div style={{ fontSize: 10, color: C.textDim }}>TOTAL LEADS</div><div style={{ fontSize: 20, fontWeight: 800, color: C.blue }}>{nonMktTotalLeads.toLocaleString()}</div></div>
+                    <div><div style={{ fontSize: 10, color: C.textDim }}>AVG RATE</div><div style={{ fontSize: 20, fontWeight: 800, color: nonMktAvgRate >= mktAvgRate ? C.accent : C.warm }}>{nonMktAvgRate}%</div></div>
+                  </div>
+                  <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                    {nonMktBenefiting.slice(0, 10).map(t => (
+                      <div key={t.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+                        <span style={{ fontSize: 12, color: C.text }}>{t.name}</span>
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: C.textMuted }}>{t.leads} leads</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: t.rate >= 60 ? C.accent : t.rate >= 40 ? C.warm : C.rose }}>{t.rate}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </ChartCard>
+
+            {/* Rising Stars & Conversion Concerns */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+              {/* Up & Comers */}
+              <ChartCard title="🚀 Rising Stars" subtitle="Trending above their all-time avg this week">
+                <div style={{ maxHeight: 350, overflowY: "auto" }}>
+                  {upAndComers.length === 0 && <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>No trending data for current period</div>}
+                  {upAndComers.slice(0, 12).map((t, i) => (
+                    <div key={t.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: `1px solid ${C.border}`, background: i === 0 ? `${C.accent}08` : "transparent" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 16 }}>{i === 0 ? "🌟" : i < 3 ? "⭐" : "🟢"}</span>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{t.name}{t.mkt && <span style={{ marginLeft: 5, fontSize: 10, color: C.accent }}>📣</span>}{t.isNew && <span style={{ marginLeft: 5, fontSize: 9, padding: "1px 5px", borderRadius: 4, background: `${C.warm}20`, color: C.warm }}>NEW</span>}</div>
+                          <div style={{ fontSize: 10, color: C.textMuted }}>This week: {t.weekLeads} leads · {t.weekBooked} booked · {t.weekRate}%</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: C.accent }}>+{t.rateChange}%</div>
+                        <div style={{ fontSize: 9, color: C.textMuted }}>vs {t.allRate}% avg</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ChartCard>
+
+              {/* Conversion Concerns */}
+              <ChartCard title="⚠️ Conversion Concerns" subtitle="High lead volume but low booking rate (<40%)">
+                <div style={{ maxHeight: 350, overflowY: "auto" }}>
+                  {concerns.length === 0 && <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>All therapists converting well!</div>}
+                  {concerns.slice(0, 12).map((t, i) => {
+                    const lostOpp = Math.round(t.leads * 0.5) - t.booked;
+                    return (
+                    <div key={t.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 14, color: C.rose }}>●</span>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{t.name}{t.mkt && <span style={{ marginLeft: 5, fontSize: 10, color: C.accent }}>📣</span>}</div>
+                          <div style={{ fontSize: 10, color: C.textMuted }}>{t.leads} leads · {t.booked} booked</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: C.rose }}>{t.rate}%</div>
+                        <div style={{ fontSize: 9, color: C.rose }}>~{lostOpp > 0 ? lostOpp : 0} potential lost</div>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
               </ChartCard>
             </div>
 
@@ -480,33 +622,11 @@ function BayviewDashboard() {
                 </div>
               </ChartCard>
             )}
+            </>
+            );
+          })()}
 
-            {/* Therapist Financial Cards */}
-            <ChartCard title="💰 Therapist Revenue & Acquisition" subtitle={`$${COST_PER_LEAD}/lead acquisition · $${REVENUE_PER_BOOKED}/booked client revenue`}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginTop: 8 }}>
-                {teamWithFinancials.slice(0, 20).map((t) => (
-                  <div key={t.name} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: t.profit >= 0 ? C.accent : C.rose, opacity: 0.6 }} />
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{t.name}{t.mkt && <span title="Marketing Program" style={{ marginLeft: 6, fontSize: 12 }}>📣</span>}</div>
-                      <div style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: t.rate >= 70 ? `${C.accent}20` : t.rate >= 50 ? `${C.warm}20` : `${C.rose}20`, color: t.rate >= 70 ? C.accent : t.rate >= 50 ? C.warm : C.rose }}>{t.rate}% booked</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
-                      <div><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>Leads</div><div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{t.leads.toLocaleString()}</div></div>
-                      <div><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>Booked</div><div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>{t.booked.toLocaleString()}</div></div>
-                      <div style={{ marginLeft: "auto", textAlign: "right" }}><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>ROI</div><div style={{ fontSize: 16, fontWeight: 700, color: t.roi >= 0 ? C.accent : C.rose }}>{t.roi}%</div></div>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 4 }}>
-                      <div style={{ fontSize: 11, color: C.rose }}><span style={{ color: C.textMuted }}>Cost: </span>{fmtCurrency(t.acqCost)}</div>
-                      <div style={{ fontSize: 11, color: C.accent }}><span style={{ color: C.textMuted }}>Revenue: </span>{fmtCurrency(t.estRevenue)}</div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: t.profit >= 0 ? C.accent : C.rose }}>{t.profit >= 0 ? "+" : ""}{fmtCurrency(t.profit)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ChartCard>
-          </>
-        )}
+
 
 
         {/* ═══ ROOM RENTAL TAB ═══ */}
