@@ -159,6 +159,7 @@ function BayviewDashboard() {
         const [recentLeads, setRecentLeads] = useState([]);
         const [loadingRecent, setLoadingRecent] = useState(false);
         const [editingLeadId, setEditingLeadId] = useState(null);
+        const [leadRefreshKey, setLeadRefreshKey] = useState(0);
 
         const LOCATIONS = ["Fort Lauderdale", "Coral Springs", "Plantation", "Telehealth", "Referred Out"];
         const SERVICE_TYPES = ["Individual Therapy", "Couples Therapy", "Family Therapy", "Adolescent Therapy", "Group Therapy", "Child Therapy", "Supervision", "Psychological Evaluation", "Christian Based Counseling", "Testing Evaluation", "CogScreen", "Psychiatric", "Mental Health Match"];
@@ -168,22 +169,23 @@ function BayviewDashboard() {
         const THERAPISTS = ["Dr. Heather V", "Dr. Heather K", "Simone F", "Jamie R", "Kimberly G", "Dr. Brittany", "Carla B", "Jackie S", "Kacee T", "BTI Nova", "Insurance", "Medicaid", "Heather D", "Dr. Jeffrey M", "Alexa V", "Alex S", "Sara S", "Tahnee M", "Taylor P", "Jessica C", "Crystal A", "Nicole A", "Pending", "David S", "Tatiana S", "Dr Michael Collins", "Seychelle S", "Caring Therapists", "Lorena A", "Dr. Halle S", "Alyssa W", "Maria C", "Claire C", "Jnay R", "Jorge H", "Jonathan S", "New Nicole G", "Adelle", "Valeria"];
         const OUTCOMES = ["Called", "Emailed", "Left Message", "Booked", "Never Booked", "Cancelled"];
 
-        const fetchPending = useCallback(() => {
-          setLoadingPending(true);
-          fetch("/api/leads/pending?days=14").then(r => r.json()).then(data => {
-            setPendingLeads(Array.isArray(data) ? data : []);
-            setLoadingPending(false);
-          }).catch(() => setLoadingPending(false));
-        }, []);
+        // fetchPending removed — now handled in useEffect
 
-        const fetchRecent = useCallback(() => {
-            setLoadingRecent(true);
-            fetch("/api/leads/recent?days=30").then(r => r.json()).then(data => {
-                setRecentLeads(Array.isArray(data) ? data : []);
-                setLoadingRecent(false);
-            }).catch(() => setLoadingRecent(false));
-        }, []);
-        useEffect(() => { if (activeTab === "intake") { fetchPending(); fetchRecent(); } }, [activeTab, fetchPending, fetchRecent]);
+        // fetchRecent removed — now handled in useEffect
+        useEffect(() => {
+            if (activeTab === "intake") {
+                setLoadingPending(true);
+                setLoadingRecent(true);
+                fetch("/api/leads/pending?days=14").then(r => r.json()).then(data => {
+                    setPendingLeads(Array.isArray(data) ? data : []);
+                    setLoadingPending(false);
+                }).catch(() => setLoadingPending(false));
+                fetch("/api/leads/recent?days=30").then(r => r.json()).then(data => {
+                    setRecentLeads(Array.isArray(data) ? data : []);
+                    setLoadingRecent(false);
+                }).catch(() => setLoadingRecent(false));
+            }
+        }, [activeTab, leadRefreshKey]);
 
         const loadLeadForEdit = (lead) => {
             setEditingLeadId(lead.id);
@@ -207,22 +209,34 @@ function BayviewDashboard() {
             window.scrollTo({top: 0, behavior: 'smooth'});
         };
         const submitLead = () => {
-          const required = ["date","location","first_name","last_name","phone","service_type","presenting_problem","referral_source","action_taken","referred_to","referral_outcome"];
-          const missing = required.filter(f => !intakeForm[f]);
-          if (missing.length) { setIntakeMsg({type:"error",text:"Missing: " + missing.join(", ")}); return; }
-          fetch("/api/leads", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(intakeForm)})
-            .then(r => r.json()).then(d => {
-              if (d.ok) {
-                setIntakeMsg({type:"success",text:"Lead #" + d.id + " saved!"});
-                setIntakeForm({date: new Date().toISOString().split('T')[0], location:'', first_name:'', last_name:'', phone:'', email:'', service_type:'', presenting_problem:'', referral_source:'', action_taken:'', referred_to:'', marketing_program:'No', referral_outcome:'', notes:''});
-                fetchPending();
-              } else { setIntakeMsg({type:"error",text:d.error || "Save failed"}); }
-            }).catch(() => setIntakeMsg({type:"error",text:"Network error"}));
+            const required = ["date","location","first_name","last_name","phone","service_type","presenting_problem","referral_source","action_taken","referred_to","referral_outcome"];
+            const missing = required.filter(f => !intakeForm[f]);
+            if (missing.length) { setIntakeMsg({type:"error",text:"Missing: " + missing.join(", ")}); return; }
+            if (editingLeadId) {
+                fetch("/api/leads/" + editingLeadId, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify(intakeForm)})
+                .then(r => r.json()).then(d => {
+                    if (d.ok) {
+                        setIntakeMsg({type:"success",text:"Lead #" + editingLeadId + " updated!"});
+                        setEditingLeadId(null);
+                        setIntakeForm({date: new Date().toISOString().split('T')[0], location:'', first_name:'', last_name:'', phone:'', email:'', service_type:'', presenting_problem:'', referral_source:'', action_taken:'', referred_to:'', marketing_program:'No', referral_outcome:'', notes:''});
+                        setLeadRefreshKey(k => k + 1);
+                    } else { setIntakeMsg({type:"error",text:d.error || "Update failed"}); }
+                }).catch(() => setIntakeMsg({type:"error",text:"Network error"}));
+            } else {
+                fetch("/api/leads", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(intakeForm)})
+                .then(r => r.json()).then(d => {
+                    if (d.ok) {
+                        setIntakeMsg({type:"success",text:"Lead #" + d.id + " saved!"});
+                        setIntakeForm({date: new Date().toISOString().split('T')[0], location:'', first_name:'', last_name:'', phone:'', email:'', service_type:'', presenting_problem:'', referral_source:'', action_taken:'', referred_to:'', marketing_program:'No', referral_outcome:'', notes:''});
+                        setLeadRefreshKey(k => k + 1);
+                    } else { setIntakeMsg({type:"error",text:d.error || "Save failed"}); }
+                }).catch(() => setIntakeMsg({type:"error",text:"Network error"}));
+            }
         };
 
         const updatePendingLead = (id, field, value) => {
           fetch("/api/leads/" + id, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({[field]: value})})
-            .then(r => r.json()).then(() => fetchPending());
+            .then(r => r.json()).then(() => setLeadRefreshKey(k => k + 1));
         };
 
   const [activeTab, setActiveTab] = useState("overview");
