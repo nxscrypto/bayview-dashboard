@@ -156,6 +156,9 @@ function BayviewDashboard() {
         const [intakeMsg, setIntakeMsg] = useState(null);
         const [pendingLeads, setPendingLeads] = useState([]);
         const [loadingPending, setLoadingPending] = useState(false);
+        const [recentLeads, setRecentLeads] = useState([]);
+        const [loadingRecent, setLoadingRecent] = useState(false);
+        const [editingLeadId, setEditingLeadId] = useState(null);
 
         const LOCATIONS = ["Fort Lauderdale", "Coral Springs", "Plantation", "Telehealth", "Referred Out"];
         const SERVICE_TYPES = ["Individual Therapy", "Couples Therapy", "Family Therapy", "Adolescent Therapy", "Group Therapy", "Child Therapy", "Supervision", "Psychological Evaluation", "Christian Based Counseling", "Testing Evaluation", "CogScreen", "Psychiatric", "Mental Health Match"];
@@ -173,8 +176,36 @@ function BayviewDashboard() {
           }).catch(() => setLoadingPending(false));
         }, []);
 
-        useEffect(() => { if (activeTab === "intake") fetchPending(); }, [activeTab, fetchPending]);
+        const fetchRecent = useCallback(() => {
+            setLoadingRecent(true);
+            fetch("/api/leads/recent?days=30").then(r => r.json()).then(data => {
+                setRecentLeads(Array.isArray(data) ? data : []);
+                setLoadingRecent(false);
+            }).catch(() => setLoadingRecent(false));
+        }, []);
+        useEffect(() => { if (activeTab === "intake") { fetchPending(); fetchRecent(); } }, [activeTab, fetchPending, fetchRecent]);
 
+        const loadLeadForEdit = (lead) => {
+            setEditingLeadId(lead.id);
+            setIntakeForm({
+                date: lead.date || '',
+                location: lead.location || '',
+                first_name: lead.first_name || '',
+                last_name: lead.last_name || '',
+                phone: lead.phone || '',
+                email: lead.email || '',
+                service_type: lead.service_type || '',
+                presenting_problem: lead.presenting_problem || '',
+                referral_source: lead.referral_source || '',
+                action_taken: lead.action_taken || '',
+                referred_to: lead.referred_to || '',
+                marketing_program: lead.marketing_program || 'No',
+                referral_outcome: lead.referral_outcome || '',
+                notes: lead.notes || ''
+            });
+            setIntakeMsg({type:"success", text:"Editing lead #" + lead.id + " — " + lead.first_name + " " + lead.last_name + ". Make changes and click Update Lead."});
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        };
         const submitLead = () => {
           const required = ["date","location","first_name","last_name","phone","service_type","presenting_problem","referral_source","action_taken","referred_to","referral_outcome"];
           const missing = required.filter(f => !intakeForm[f]);
@@ -200,7 +231,7 @@ function BayviewDashboard() {
     { id: "overview", label: "Overview" },
     { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
-          { id: "intake", label: "\u{1F4CB} Lead Intake" },
+          { id: "intake", label: "Lead Intake" },
   ];
   const filterBtns = [
     { id: "ytd", label: "Year-to-Date" },
@@ -758,7 +789,7 @@ function BayviewDashboard() {
             {activeTab === "intake" && (
               <div>
                 {/* ── Intake Form ── */}
-                <ChartCard title="\u{1F4CB} New Lead Intake" subtitle="Enter new lead information" style={{marginBottom: 24}}>
+                <ChartCard title="New Lead Intake" subtitle="Enter new lead information" style={{marginBottom: 24}}>
                   {intakeMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: intakeMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: intakeMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{intakeMsg.text}</div>}
                   <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:12}}>
                     <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Date *</label><input type="date" value={intakeForm.date} onChange={e => setIntakeForm({...intakeForm, date: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
@@ -776,11 +807,14 @@ function BayviewDashboard() {
                     <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Referral Outcome *</label><select value={intakeForm.referral_outcome} onChange={e => setIntakeForm({...intakeForm, referral_outcome: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
                   </div>
                   <div style={{marginTop:12}}><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Notes</label><textarea value={intakeForm.notes} onChange={e => setIntakeForm({...intakeForm, notes: e.target.value})} rows={2} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13, resize:"vertical"}} /></div>
-                  <button onClick={submitLead} style={{marginTop:16, padding:"10px 32px", background:C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:700, fontSize:14, cursor:"pointer"}}>Submit Lead</button>
+                  <div style={{display:"flex", gap:12, marginTop:16}}>
+                    <button onClick={submitLead} style={{padding:"10px 32px", background: editingLeadId ? "#F59E0B" : C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:700, fontSize:14, cursor:"pointer"}}>{editingLeadId ? "Update Lead #" + editingLeadId : "Submit Lead"}</button>
+                    {editingLeadId && <button onClick={() => { setEditingLeadId(null); setIntakeForm({date: new Date().toISOString().split('T')[0], location:'', first_name:'', last_name:'', phone:'', email:'', service_type:'', presenting_problem:'', referral_source:'', action_taken:'', referred_to:'', marketing_program:'No', referral_outcome:'', notes:''}); setIntakeMsg(null); }} style={{padding:"10px 24px", background:"transparent", color:C.textMuted, border:"1px solid #2a2a4a", borderRadius:8, fontWeight:600, fontSize:14, cursor:"pointer"}}>Cancel Edit</button>}
+                    </div>
                 </ChartCard>
 
                 {/* ── Pending Leads Manager ── */}
-                <ChartCard title="\u{23F3} Pending Leads" subtitle={"Leads awaiting therapist assignment or booking confirmation (last 14 days) \u00B7 " + pendingLeads.length + " pending"}>
+                <ChartCard title="Pending Leads" subtitle={"Leads awaiting therapist assignment or booking confirmation (last 14 days) \u00B7 " + pendingLeads.length + " pending"}>
                   {loadingPending ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>Loading...</div> :
                   pendingLeads.length === 0 ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>No pending leads in the last 14 days</div> :
                   <div style={{overflowX:"auto"}}>
@@ -798,7 +832,7 @@ function BayviewDashboard() {
                       </tr></thead>
                       <tbody>{pendingLeads.map(lead => {
                         const daysAgo = Math.floor((Date.now() - new Date(lead.date).getTime()) / 86400000);
-                        return <tr key={lead.id} style={{borderBottom:"1px solid #1a1a2e"}}>
+                        return <tr key={lead.id} onClick={() => loadLeadForEdit(lead)} style={{borderBottom:"1px solid #1a1a2e", cursor:"pointer"}} onMouseEnter={e => e.currentTarget.style.background="#141428"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
                           <td style={{padding:"8px 6px", color:C.text, whiteSpace:"nowrap"}}>{lead.date}</td>
                           <td style={{padding:"8px 6px", color:C.text, fontWeight:600}}>{lead.first_name} {lead.last_name}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted, whiteSpace:"nowrap"}}>{lead.phone}</td>
@@ -810,6 +844,40 @@ function BayviewDashboard() {
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.notes}</td>
                         </tr>;
                       })}</tbody>
+                    </table>
+                  </div>}
+                </ChartCard>
+
+                {/* ── Recent Leads (Last 30 Days) ── */}
+                <ChartCard title="Recent Leads" subtitle={"All leads from the last 30 days \u00B7 " + recentLeads.length + " leads"} style={{marginTop: 24}}>
+                  {loadingRecent ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>Loading...</div> :
+                  recentLeads.length === 0 ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>No leads in the last 30 days</div> :
+                  <div style={{overflowX:"auto", maxHeight: 500, overflowY:"auto"}}>
+                    <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
+                      <thead style={{position:"sticky", top:0, background:C.card, zIndex:1}}><tr style={{borderBottom:"1px solid #2a2a4a"}}>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>#</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Date</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Name</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Phone</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Location</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Service</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Referred To</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Outcome</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Source</th>
+                      </tr></thead>
+                      <tbody>{recentLeads.map(lead => (
+                        <tr key={lead.id} onClick={() => loadLeadForEdit(lead)} style={{borderBottom:"1px solid #1a1a2e", cursor:"pointer", background: editingLeadId === lead.id ? "#1E3A5F" : "transparent", transition:"background 0.15s"}} onMouseEnter={e => { if (editingLeadId !== lead.id) e.currentTarget.style.background="#141428"; }} onMouseLeave={e => { if (editingLeadId !== lead.id) e.currentTarget.style.background="transparent"; }}>
+                          <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11}}>{lead.id}</td>
+                          <td style={{padding:"8px 6px", color:C.text, whiteSpace:"nowrap"}}>{lead.date}</td>
+                          <td style={{padding:"8px 6px", color:C.text, fontWeight:600, whiteSpace:"nowrap"}}>{lead.first_name} {lead.last_name}</td>
+                          <td style={{padding:"8px 6px", color:C.textMuted, whiteSpace:"nowrap"}}>{lead.phone}</td>
+                          <td style={{padding:"8px 6px", color:C.textMuted}}>{lead.location}</td>
+                          <td style={{padding:"8px 6px", color:C.textMuted, maxWidth:120, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.service_type}</td>
+                          <td style={{padding:"8px 6px", color: lead.referred_to === "Pending" ? C.yellow : C.accent, fontWeight:600}}>{lead.referred_to}</td>
+                          <td style={{padding:"8px 6px", color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" || lead.referral_outcome === "Cancelled" ? C.rose : C.textMuted}}>{lead.referral_outcome}</td>
+                          <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11}}>{lead.referral_source}</td>
+                        </tr>
+                      ))}</tbody>
                     </table>
                   </div>}
                 </ChartCard>
