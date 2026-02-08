@@ -237,6 +237,13 @@ function BayviewDashboard() {
           fetch("/api/leads/" + id, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({[field]: value})})
             .then(r => r.json()).then(() => { setLeadRefreshKey(k => k + 1); refreshDashboardData(); });
         };
+        const deleteLead = (id, name) => {
+          if (!confirm("Delete lead \"" + name + "\"? This cannot be undone.")) return;
+          fetch("/api/leads/" + id, {method:"DELETE"})
+            .then(r => r.json()).then(d => {
+              if (d.ok) { setLeadRefreshKey(k => k + 1); refreshDashboardData(); }
+            });
+        };
 
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -857,6 +864,7 @@ function BayviewDashboard() {
                         <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Assigned To</th>
                         <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Outcome</th>
                         <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Notes</th>
+                        <th style={{padding:"8px 6px", textAlign:"center", color:C.textMuted, fontWeight:600, width:"40px"}}></th>
                       </tr></thead>
                       <tbody>{pendingLeads.map(lead => {
                         const daysAgo = Math.floor((Date.now() - new Date(lead.date).getTime()) / 86400000);
@@ -870,6 +878,7 @@ function BayviewDashboard() {
                           <td style={{padding:"8px 6px"}}><select value={lead.referred_to} onChange={e => updatePendingLead(lead.id, "referred_to", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: C.text, fontSize:11, maxWidth:130}}><option value="Pending">Pending</option>{THERAPISTS.filter(t => t !== "Pending").map(t => <option key={t} value={t}>{t}</option>)}</select></td>
                           <td style={{padding:"8px 6px"}}><select value={lead.referral_outcome} onChange={e => updatePendingLead(lead.id, "referral_outcome", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" ? C.rose : C.text, fontSize:11}}>{OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}</select></td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.notes}</td>
+                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={() => deleteLead(lead.id, lead.first_name + " " + lead.last_name)} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">×</button></td>
                         </tr>;
                       })}</tbody>
                     </table>
@@ -892,6 +901,7 @@ function BayviewDashboard() {
                         <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Referred To</th>
                         <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Outcome</th>
                         <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Source</th>
+                        <th style={{padding:"8px 6px", textAlign:"center", color:C.textMuted, fontWeight:600, width:"40px"}}></th>
                       </tr></thead>
                       <tbody>{recentLeads.map(lead => (
                         <tr key={lead.id} onClick={() => loadLeadForEdit(lead)} style={{borderBottom:"1px solid #1a1a2e", cursor:"pointer", background: editingLeadId === lead.id ? "#1E3A5F" : "transparent", transition:"background 0.15s"}} onMouseEnter={e => { if (editingLeadId !== lead.id) e.currentTarget.style.background="#141428"; }} onMouseLeave={e => { if (editingLeadId !== lead.id) e.currentTarget.style.background="transparent"; }}>
@@ -904,6 +914,7 @@ function BayviewDashboard() {
                           <td style={{padding:"8px 6px", color: C.text, fontWeight:600}}>{lead.referred_to}</td>
                           <td style={{padding:"8px 6px", color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" || lead.referral_outcome === "Cancelled" ? C.rose : C.textMuted}}>{lead.referral_outcome}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11}}>{lead.referral_source}</td>
+                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={(e) => { e.stopPropagation(); deleteLead(lead.id, lead.first_name + " " + lead.last_name); }} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">×</button></td>
                         </tr>
                       ))}</tbody>
                     </table>
