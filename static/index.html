@@ -150,10 +150,8 @@ function BayviewDashboard() {
 
   const tabs = [
     { id: "overview", label: "Overview" },
-    { id: "marketing", label: "Marketing" },
+    { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
-    { id: "revenue", label: "Revenue" },
-    { id: "rental", label: "🏢 Room Rental" },
     { id: "forecast", label: "Forecast" },
     { id: "trends", label: "Trends" },
   ];
@@ -338,60 +336,6 @@ function BayviewDashboard() {
           </>
         )}
 
-        {/* ═══ MARKETING TAB ═══ */}
-        {activeTab === "marketing" && (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-              {stats.sources.slice(0, 4).map((s, i) => (
-                <StatCard key={s.name} label={s.name} value={s.count.toLocaleString()} icon={["🔍","📱","📖","👥"][i]} color={[C.accent, C.blue, C.warm, C.purple][i]} sub={`${Math.round(s.count / stats.total * 100)}% of leads`} />
-              ))}
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-              <ChartCard title="All Referral Sources" subtitle="Where leads are coming from">
-                <ResponsiveContainer width="100%" height={Math.max(300, stats.sources.length * 28)}>
-                  <BarChart data={stats.sources} layout="vertical" margin={{ left: 10, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} width={120} />
-                    <Tooltip content={<Tip />} />
-                    <Bar dataKey="count" name="Leads" radius={[0, 6, 6, 0]} barSize={16}>
-                      {stats.sources.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              <ChartCard title="Referral Outcomes" subtitle="How leads convert">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie data={stats.outcomes} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2} label={({ name, count }) => `${name} (${count.toLocaleString()})`} labelLine={{ stroke: C.textDim }} style={{ fontSize: 10 }}>
-                      {stats.outcomes.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip content={<Tip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </div>
-
-            <ChartCard title="Marketing Program Participation" subtitle="Are referred therapists in the marketing program?">
-              <div style={{ display: "flex", gap: 24, alignItems: "center", padding: "10px 0" }}>
-                {stats.marketing.map(m => {
-                  const pct = Math.round(m.count / stats.total * 100);
-                  return (
-                    <div key={m.name} style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: 28, fontWeight: 800, color: m.name === "Yes" ? C.accent : C.rose }}>{m.count.toLocaleString()}</div>
-                      <div style={{ fontSize: 12, color: C.textMuted }}>{m.name || "Unknown"} ({pct}%)</div>
-                      <div style={{ height: 6, background: C.bg, borderRadius: 3, marginTop: 8, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${pct}%`, background: m.name === "Yes" ? C.accent : C.rose, borderRadius: 3 }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ChartCard>
-          </>
-        )}
 
         {/* ═══ TEAM TAB ═══ */}
         {activeTab === "team" && (
@@ -497,130 +441,6 @@ function BayviewDashboard() {
           </>
         )}
 
-        {/* ═══ REVENUE TAB ═══ */}
-        {activeTab === "revenue" && (() => {
-          const cf = PRECOMPUTED._cashflow || { weekly: [], monthly: [], rates: { therapyPerWeek: 0, testingPerWeek: 0 }, todayWeek: '' };
-          const thisWeek = cf.weekly.find(w => w.week === cf.todayWeek) || {};
-          const nextWeeks = cf.weekly.filter(w => w.week > cf.todayWeek);
-          const next4Total = nextWeeks.slice(0, 4).reduce((s, w) => s + (w.med || 0), 0);
-          const futureMonths = cf.monthly.filter(m => m.month >= '2026-02');
-          const fmtWk = (d) => { const dt = new Date(d + 'T00:00:00'); return `${dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`; };
-          return (
-          <>
-            {/* KPIs */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-              <StatCard label="This Week Revenue" value={fmtCurrency(thisWeek.med || 0)} icon="💰" color={C.accent} sub={`Therapy: ${fmtCurrency(thisWeek.medT || 0)} · Testing: ${fmtCurrency(thisWeek.medX || 0)}`} />
-              <StatCard label="Next 4 Weeks" value={fmtCurrency(next4Total)} icon="📅" color={C.blue} sub="Projected (expected)" />
-              <StatCard label="Therapy Bookings" value={`${cf.rates.therapyPerWeek}/wk`} icon="🛋️" color={C.warm} sub="Avg new clients/week (90d)" />
-              <StatCard label="Testing Bookings" value={`${cf.rates.testingPerWeek}/wk`} icon="📋" color={C.purple} sub="Avg new clients/week (90d)" />
-            </div>
-
-            {/* Revenue Model Explainer */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 22px", marginBottom: 16, display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>📊 Cash Flow Model</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Therapy: <strong style={{ color: C.accent }}>${ROOM_RENTAL}/session</strong> starting 1 week after booking</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Testing: <strong style={{ color: C.warm }}>$1,500</strong> at 1 week after booking</div>
-              <div style={{ display: "flex", gap: 12, marginLeft: "auto" }}>
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${C.rose}20`, color: C.rose }}>Low: 3 sessions</span>
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${C.accent}20`, color: C.accent }}>Med: 5 sessions</span>
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: `${C.blue}20`, color: C.blue }}>High: 8 sessions</span>
-              </div>
-            </div>
-
-            {/* Weekly Cash Flow Chart */}
-            <ChartCard title="📅 Weekly Cash Flow" subtitle="Actual revenue from past bookings + projected revenue from estimated future bookings" style={{ marginBottom: 16 }}>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={cf.weekly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                  <XAxis dataKey="week" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} tickFormatter={fmtWk} />
-                  <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<Tip />} formatter={(v) => `$${v.toLocaleString()}`} labelFormatter={fmtWk} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="low" name="Conservative (3 sess)" fill={C.rose} radius={[2, 2, 0, 0]} barSize={10} opacity={0.6} />
-                  <Bar dataKey="med" name="Expected (5 sess)" fill={C.accent} radius={[2, 2, 0, 0]} barSize={10} />
-                  <Bar dataKey="high" name="Optimistic (8 sess)" fill={C.blue} radius={[2, 2, 0, 0]} barSize={10} opacity={0.6} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            {/* Monthly Revenue Chart */}
-            <ChartCard title="📊 Monthly Revenue Forecast" subtitle="Therapy + testing revenue by month" style={{ marginBottom: 16 }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={cf.monthly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} tickFormatter={fmtMonth} />
-                  <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<Tip />} formatter={(v) => `$${v.toLocaleString()}`} labelFormatter={fmtMonth} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="medT" name="Therapy Room Rental" fill={C.blue} radius={[4, 4, 0, 0]} stackId="rev" barSize={24} />
-                  <Bar dataKey="medX" name="Testing Fee" fill={C.warm} radius={[4, 4, 0, 0]} stackId="rev" barSize={24} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            {/* Weekly Detail Table */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <ChartCard title="Weekly Cash Flow Detail" subtitle="Per-week revenue across scenarios">
-                <div style={{ maxHeight: 500, overflowY: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, background: C.card }}>
-                        <th style={{ textAlign: "left", padding: "6px 8px", color: C.textMuted, fontWeight: 600 }}>Week of</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px", color: C.rose, fontWeight: 600 }}>Low</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px", color: C.accent, fontWeight: 600 }}>Expected</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px", color: C.blue, fontWeight: 600 }}>High</th>
-                        <th style={{ textAlign: "center", padding: "6px 8px", color: C.textDim, fontWeight: 600 }}>Type</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cf.weekly.map((w, i) => (
-                        <tr key={i} style={{ borderBottom: `1px solid ${C.border}15`, background: w.week === cf.todayWeek ? `${C.accent}08` : "transparent" }}>
-                          <td style={{ padding: "5px 8px", color: C.text, fontWeight: w.week === cf.todayWeek ? 700 : 400 }}>{fmtWk(w.week)}{w.week === cf.todayWeek ? " ←" : ""}</td>
-                          <td style={{ padding: "5px 8px", color: C.rose, textAlign: "right" }}>{fmtCurrency(w.low)}</td>
-                          <td style={{ padding: "5px 8px", color: C.accent, textAlign: "right", fontWeight: 600 }}>{fmtCurrency(w.med)}</td>
-                          <td style={{ padding: "5px 8px", color: C.blue, textAlign: "right" }}>{fmtCurrency(w.high)}</td>
-                          <td style={{ padding: "5px 8px", textAlign: "center", fontSize: 10, color: w.proj ? C.warm : C.accent }}>{w.proj ? "📊 Proj" : "✓ Actual"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </ChartCard>
-
-              <ChartCard title="Monthly Revenue Summary" subtitle="Total by month across scenarios">
-                <div style={{ maxHeight: 500, overflowY: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, background: C.card }}>
-                        <th style={{ textAlign: "left", padding: "6px 8px", color: C.textMuted, fontWeight: 600 }}>Month</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px", color: C.rose, fontWeight: 600 }}>Low</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px", color: C.accent, fontWeight: 600 }}>Expected</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px", color: C.blue, fontWeight: 600 }}>High</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cf.monthly.map((m, i) => (
-                        <tr key={i} style={{ borderBottom: `1px solid ${C.border}15` }}>
-                          <td style={{ padding: "5px 8px", color: C.text, fontWeight: 500 }}>{fmtMonth(m.month)}</td>
-                          <td style={{ padding: "5px 8px", color: C.rose, textAlign: "right" }}>{fmtCurrency(m.low)}</td>
-                          <td style={{ padding: "5px 8px", color: C.accent, textAlign: "right", fontWeight: 600 }}>{fmtCurrency(m.med)}</td>
-                          <td style={{ padding: "5px 8px", color: C.blue, textAlign: "right" }}>{fmtCurrency(m.high)}</td>
-                        </tr>
-                      ))}
-                      <tr style={{ borderTop: `2px solid ${C.border}`, fontWeight: 700 }}>
-                        <td style={{ padding: "6px 8px", color: C.text }}>Total</td>
-                        <td style={{ padding: "6px 8px", color: C.rose, textAlign: "right" }}>{fmtCurrency(cf.monthly.reduce((s, m) => s + m.low, 0))}</td>
-                        <td style={{ padding: "6px 8px", color: C.accent, textAlign: "right" }}>{fmtCurrency(cf.monthly.reduce((s, m) => s + m.med, 0))}</td>
-                        <td style={{ padding: "6px 8px", color: C.blue, textAlign: "right" }}>{fmtCurrency(cf.monthly.reduce((s, m) => s + m.high, 0))}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </ChartCard>
-            </div>
-          </>
-          );
-        })()}
 
         {/* ═══ ROOM RENTAL TAB ═══ */}
         {activeTab === "rental" && (() => {
