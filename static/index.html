@@ -144,12 +144,63 @@ const RankRow = ({ rank, name, count, max, color, booked, rate, cost, revenue })
 
 function BayviewDashboard() {
   const [timeFilter, setTimeFilter] = useState("month");
+
+        // Lead Intake state
+        const [intakeForm, setIntakeForm] = useState({
+          date: new Date().toISOString().split('T')[0],
+          location: '', first_name: '', last_name: '', phone: '', email: '',
+          service_type: '', presenting_problem: '', referral_source: '',
+          action_taken: '', referred_to: '', marketing_program: 'No',
+          referral_outcome: '', notes: ''
+        });
+        const [intakeMsg, setIntakeMsg] = useState(null);
+        const [pendingLeads, setPendingLeads] = useState([]);
+        const [loadingPending, setLoadingPending] = useState(false);
+
+        const LOCATIONS = ["Fort Lauderdale", "Coral Springs", "Plantation", "Telehealth", "Referred Out"];
+        const SERVICE_TYPES = ["Individual Therapy", "Couples Therapy", "Family Therapy", "Adolescent Therapy", "Group Therapy", "Child Therapy", "Supervision", "Psychological Evaluation", "Christian Based Counseling", "Testing Evaluation", "CogScreen", "Psychiatric", "Mental Health Match"];
+        const PROBLEMS = ["Relationship Issues", "Stress/Anxiety", "Depression", "Self-Esteem", "Work-Related Issues", "Parenting", "Addiction", "Grief/Loss", "Trauma/PTSD", "Maternal Mental Health", "Testing", "Medication"];
+        const REFERRAL_SOURCES = ["Google", "Psychology Today", "Social Media", "Bayview Therapists", "Associations (FAMFT, BAMFT, etc.)", "Doctors", "Psychiatrists", "Colleagues", "Family/Friends", "Previous Clients", "Schools", "BSAC", "FRCF", "ALMA", "BSO", "NeuroHealth Treatment Centers"];
+        const ACTIONS = ["Scheduled Appointment", "Referred to Bayview Therapist", "Referred to Outside Provider", "Pending"];
+        const THERAPISTS = ["Dr. Heather V", "Dr. Heather K", "Simone F", "Jamie R", "Kimberly G", "Dr. Brittany", "Carla B", "Jackie S", "Kacee T", "BTI Nova", "Insurance", "Medicaid", "Heather D", "Dr. Jeffrey M", "Alexa V", "Alex S", "Sara S", "Tahnee M", "Taylor P", "Jessica C", "Crystal A", "Nicole A", "Pending", "David S", "Tatiana S", "Dr Michael Collins", "Seychelle S", "Caring Therapists", "Lorena A", "Dr. Halle S", "Alyssa W", "Maria C", "Claire C", "Jnay R", "Jorge H", "Jonathan S", "New Nicole G", "Adelle", "Valeria"];
+        const OUTCOMES = ["Called", "Emailed", "Left Message", "Booked", "Never Booked", "Cancelled"];
+
+        const fetchPending = useCallback(() => {
+          setLoadingPending(true);
+          fetch("/api/leads/pending?days=14").then(r => r.json()).then(data => {
+            setPendingLeads(Array.isArray(data) ? data : []);
+            setLoadingPending(false);
+          }).catch(() => setLoadingPending(false));
+        }, []);
+
+        useEffect(() => { if (activeTab === "intake") fetchPending(); }, [activeTab, fetchPending]);
+
+        const submitLead = () => {
+          const required = ["date","location","first_name","last_name","phone","service_type","presenting_problem","referral_source","action_taken","referred_to","referral_outcome"];
+          const missing = required.filter(f => !intakeForm[f]);
+          if (missing.length) { setIntakeMsg({type:"error",text:"Missing: " + missing.join(", ")}); return; }
+          fetch("/api/leads", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(intakeForm)})
+            .then(r => r.json()).then(d => {
+              if (d.ok) {
+                setIntakeMsg({type:"success",text:"Lead #" + d.id + " saved!"});
+                setIntakeForm({date: new Date().toISOString().split('T')[0], location:'', first_name:'', last_name:'', phone:'', email:'', service_type:'', presenting_problem:'', referral_source:'', action_taken:'', referred_to:'', marketing_program:'No', referral_outcome:'', notes:''});
+                fetchPending();
+              } else { setIntakeMsg({type:"error",text:d.error || "Save failed"}); }
+            }).catch(() => setIntakeMsg({type:"error",text:"Network error"}));
+        };
+
+        const updatePendingLead = (id, field, value) => {
+          fetch("/api/leads/" + id, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({[field]: value})})
+            .then(r => r.json()).then(() => fetchPending());
+        };
+
   const [activeTab, setActiveTab] = useState("overview");
 
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
+          { id: "intake", label: "\u{1F4CB} Lead Intake" },
   ];
   const filterBtns = [
     { id: "ytd", label: "Year-to-Date" },
@@ -701,6 +752,69 @@ function BayviewDashboard() {
           })()}
 
 
+
+
+            {/* ════════ LEAD INTAKE TAB ════════ */}
+            {activeTab === "intake" && (
+              <div>
+                {/* ── Intake Form ── */}
+                <Card title="\u{1F4CB} New Lead Intake" subtitle="Enter new lead information" style={{marginBottom: 24}}>
+                  {intakeMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: intakeMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: intakeMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{intakeMsg.text}</div>}
+                  <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:12}}>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Date *</label><input type="date" value={intakeForm.date} onChange={e => setIntakeForm({...intakeForm, date: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Location *</label><select value={intakeForm.location} onChange={e => setIntakeForm({...intakeForm, location: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>First Name *</label><input value={intakeForm.first_name} onChange={e => setIntakeForm({...intakeForm, first_name: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Last Name *</label><input value={intakeForm.last_name} onChange={e => setIntakeForm({...intakeForm, last_name: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Phone *</label><input placeholder="xxx-xxx-xxxx" value={intakeForm.phone} onChange={e => setIntakeForm({...intakeForm, phone: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Email</label><input value={intakeForm.email} onChange={e => setIntakeForm({...intakeForm, email: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Type of Service *</label><select value={intakeForm.service_type} onChange={e => setIntakeForm({...intakeForm, service_type: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Presenting Problem *</label><select value={intakeForm.presenting_problem} onChange={e => setIntakeForm({...intakeForm, presenting_problem: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{PROBLEMS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Referral Source *</label><select value={intakeForm.referral_source} onChange={e => setIntakeForm({...intakeForm, referral_source: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{REFERRAL_SOURCES.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Action Taken *</label><select value={intakeForm.action_taken} onChange={e => setIntakeForm({...intakeForm, action_taken: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Referred to Bayview Team? *</label><select value={intakeForm.referred_to} onChange={e => setIntakeForm({...intakeForm, referred_to: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{THERAPISTS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Marketing Program? *</label><select value={intakeForm.marketing_program} onChange={e => setIntakeForm({...intakeForm, marketing_program: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Referral Outcome *</label><select value={intakeForm.referral_outcome} onChange={e => setIntakeForm({...intakeForm, referral_outcome: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select...</option>{OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+                  </div>
+                  <div style={{marginTop:12}}><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Notes</label><textarea value={intakeForm.notes} onChange={e => setIntakeForm({...intakeForm, notes: e.target.value})} rows={2} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13, resize:"vertical"}} /></div>
+                  <button onClick={submitLead} style={{marginTop:16, padding:"10px 32px", background:C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:700, fontSize:14, cursor:"pointer"}}>Submit Lead</button>
+                </Card>
+
+                {/* ── Pending Leads Manager ── */}
+                <Card title="\u{23F3} Pending Leads" subtitle={"Leads awaiting therapist assignment or booking confirmation (last 14 days) \u00B7 " + pendingLeads.length + " pending"}>
+                  {loadingPending ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>Loading...</div> :
+                  pendingLeads.length === 0 ? <div style={{color:C.textMuted, padding:20, textAlign:"center"}}>No pending leads in the last 14 days</div> :
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
+                      <thead><tr style={{borderBottom:"1px solid #2a2a4a"}}>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Date</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Name</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Phone</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Service</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Location</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Days</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Assigned To</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Outcome</th>
+                        <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Notes</th>
+                      </tr></thead>
+                      <tbody>{pendingLeads.map(lead => {
+                        const daysAgo = Math.floor((Date.now() - new Date(lead.date).getTime()) / 86400000);
+                        return <tr key={lead.id} style={{borderBottom:"1px solid #1a1a2e"}}>
+                          <td style={{padding:"8px 6px", color:C.text, whiteSpace:"nowrap"}}>{lead.date}</td>
+                          <td style={{padding:"8px 6px", color:C.text, fontWeight:600}}>{lead.first_name} {lead.last_name}</td>
+                          <td style={{padding:"8px 6px", color:C.textMuted, whiteSpace:"nowrap"}}>{lead.phone}</td>
+                          <td style={{padding:"8px 6px", color:C.textMuted, maxWidth:120, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.service_type}</td>
+                          <td style={{padding:"8px 6px", color:C.textMuted}}>{lead.location}</td>
+                          <td style={{padding:"8px 6px", color: daysAgo >= 10 ? C.rose : daysAgo >= 5 ? C.yellow : C.accent, fontWeight:700}}>{daysAgo}d</td>
+                          <td style={{padding:"8px 6px"}}><select value={lead.referred_to} onChange={e => updatePendingLead(lead.id, "referred_to", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: lead.referred_to === "Pending" ? C.yellow : C.accent, fontSize:11, maxWidth:130}}><option value="Pending">Pending</option>{THERAPISTS.filter(t => t !== "Pending").map(t => <option key={t} value={t}>{t}</option>)}</select></td>
+                          <td style={{padding:"8px 6px"}}><select value={lead.referral_outcome} onChange={e => updatePendingLead(lead.id, "referral_outcome", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" ? C.rose : C.text, fontSize:11}}>{OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}</select></td>
+                          <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.notes}</td>
+                        </tr>;
+                      })}</tbody>
+                    </table>
+                  </div>}
+                </Card>
+              </div>
+            )}
 
 
         {/* ═══ ROOM RENTAL TAB ═══ */}
