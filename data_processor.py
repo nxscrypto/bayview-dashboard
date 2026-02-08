@@ -7,6 +7,12 @@ import csv
 import json
 import io
 import logging
+
+try:
+    from database import get_leads_for_dashboard
+    HAS_DB = True
+except ImportError:
+    HAS_DB = False
 import requests
 from datetime import datetime, timedelta, date
 from collections import Counter, defaultdict
@@ -327,6 +333,46 @@ def build_period(leads, prev_leads=None):
                           "bookingRate": round(pb / pt * 100) if pt else 0}
     return result
 
+
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Convert custom DB leads to dashboard format
+# ──────────────────────────────────────────────────────────────────────────────
+
+def convert_db_leads():
+    """Fetch leads from SQLite DB and convert to same format as CSV-parsed leads."""
+    if not HAS_DB:
+        return []
+    try:
+        db_rows = get_leads_for_dashboard()
+    except Exception as e:
+        logger.warning("Could not load DB leads: %s", e)
+        return []
+
+    leads = []
+    for row in db_rows:
+        dt = parse_date(row.get("date", ""))
+        if not dt:
+            continue
+        svc_raw = row.get("service_type", "")
+        out_raw = row.get("referral_outcome", "")
+        booked = out_raw.lower() in ("booked", "boked") if out_raw else False
+        leads.append({
+            "date": dt,
+            "service": normalize_service(svc_raw) if svc_raw else None,
+            "service_raw": svc_raw,
+            "problem": row.get("presenting_problem") or None,
+            "source": normalize_source(row.get("referral_source", "")) if row.get("referral_source") else "Unknown",
+            "action": get_action(row.get("action_taken", "")) if row.get("action_taken") else None,
+            "team_member": normalize_team_member(row.get("referred_to", "")) if row.get("referred_to") else None,
+            "outcome": normalize_outcome(out_raw) if out_raw else "Unknown",
+            "booked": booked,
+            "marketing": row.get("marketing_program") or None,
+            "location": normalize_location(row.get("location", "")) if row.get("location") else "Unknown",
+        })
+    logger.info("Loaded %d leads from custom DB", len(leads))
+    return leads
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Process lead CSV rows
@@ -659,7 +705,15 @@ def generate_data() -> dict:
     rental_rows = fetch_csv(RENTAL_CSV_URL)
 
     all_leads = process_leads(lead_rows)
-    logger.info("Processed %d leads", len(all_leads))
+    logger.info("Processed %d leads from Google Sheets", len(all_leads))
+
+    # Merge in custom DB leads
+    db_leads = convert_db_leads()
+    if db_leads:
+        # Deduplicate: skip DB leads whose (date, first_name+last_name combo) might already exist
+        # For now, simply append — DB leads use the intake form and won't duplicate CSV entries
+        all_leads.extend(db_leads)
+        logger.info("Total leads after DB merge: %d", len(all_leads))
 
     # Slice by period
     ytd       = [l for l in all_leads if year_start <= l["date"] <= today]
