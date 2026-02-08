@@ -172,24 +172,6 @@ function BayviewDashboard() {
         // fetchPending removed — now handled in useEffect
 
         // fetchRecent removed — now handled in useEffect
-        useEffect(() => {
-            if (activeTab === "intake") {
-                setLoadingPending(true);
-                setLoadingRecent(true);
-                fetch("/api/leads/pending?days=14").then(r => r.json()).then(data => {
-                    const arr = Array.isArray(data) ? data : [];
-                    window._dbgPending = arr;
-                    setPendingLeads(arr);
-                    setLoadingPending(false);
-                }).catch(e => { window._dbgPendingErr = e.message; setLoadingPending(false); });
-                fetch("/api/leads/recent?days=30").then(r => r.json()).then(data => {
-                    const arr = Array.isArray(data) ? data : [];
-                    window._dbgRecent = arr;
-                    setRecentLeads(arr);
-                    setLoadingRecent(false);
-                }).catch(e => { window._dbgRecentErr = e.message; setLoadingRecent(false); });
-            }
-        }, [activeTab, leadRefreshKey]);
 
         const loadLeadForEdit = (lead) => {
             setEditingLeadId(lead.id);
@@ -244,6 +226,21 @@ function BayviewDashboard() {
         };
 
   const [activeTab, setActiveTab] = useState("overview");
+
+        useEffect(() => {
+            if (activeTab === "intake") {
+                setLoadingPending(true);
+                setLoadingRecent(true);
+                fetch("/api/leads/pending?days=14").then(r => r.json()).then(data => {
+                    setPendingLeads(Array.isArray(data) ? data : []);
+                    setLoadingPending(false);
+                }).catch(() => setLoadingPending(false));
+                fetch("/api/leads/recent?days=30").then(r => r.json()).then(data => {
+                    setRecentLeads(Array.isArray(data) ? data : []);
+                    setLoadingRecent(false);
+                }).catch(() => setLoadingRecent(false));
+            }
+        }, [activeTab, leadRefreshKey]);
 
   const tabs = [
     { id: "overview", label: "Overview" },
