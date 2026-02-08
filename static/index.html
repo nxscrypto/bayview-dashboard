@@ -74,7 +74,6 @@ const CHART_COLORS = ["#3ECFB4","#F0A050","#5B8DEF","#E85D75","#9B72CF","#70D4A0
 const LOC_COLORS = { "Fort Lauderdale": "#3ECFB4", "Coral Springs": "#5B8DEF", "Plantation": "#F0A050", "Telehealth": "#9B72CF", "Unknown": "#556677", "Referred Out": "#E85D75" };
 
 const COST_PER_LEAD = 150;
-const REVENUE_PER_BOOKED = 600;
 const ROOM_RENTAL = 40;
 const AVG_SESSIONS = 3;
 const THERAPY_REV = ROOM_RENTAL * AVG_SESSIONS;
@@ -183,19 +182,43 @@ function BayviewDashboard() {
     });
   }, [stats, useMonthly]);
 
-  // Enrich team with financials
-  const teamWithFinancials = useMemo(() =>
-    stats.team.map(t => ({
-      ...t,
-      acqCost: t.leads * COST_PER_LEAD,
-      estRevenue: t.booked * REVENUE_PER_BOOKED,
-      profit: (t.booked * REVENUE_PER_BOOKED) - (t.leads * COST_PER_LEAD),
-      roi: t.leads > 0 ? Math.round(((t.booked * REVENUE_PER_BOOKED - t.leads * COST_PER_LEAD) / (t.leads * COST_PER_LEAD)) * 100) : 0,
-    })), [stats.team]
-  );
+        // Enrich team with financials - using actual rental revenue
+        const rentalTherapistMap = useMemo(() => {
+          const R = PRECOMPUTED._rental || {};
+          const periodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisMonthTherapists", today: "thisMonthTherapists", all: "therapists", lastyear: "lyTherapists" };
+          const therapistList = R[periodMap[timeFilter]] || R.therapists || [];
+          const norm = (n) => n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+          const map = {};
+          therapistList.forEach(t => {
+            const key = norm(t.name);
+            map[key] = (map[key] || 0) + t.total;
+          });
+          return map;
+        }, [timeFilter]);
 
-  const totalAcq = teamWithFinancials.reduce((s, t) => s + t.acqCost, 0);
-  const totalRev = teamWithFinancials.reduce((s, t) => s + t.estRevenue, 0);
+        const teamWithFinancials = useMemo(() => {
+          const norm = (n) => n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+          return stats.team.map(t => {
+            const key = norm(t.name);
+            // Try direct match, then first-name match
+            let actualRevenue = rentalTherapistMap[key] || 0;
+            if (!actualRevenue) {
+              const firstName = key.split(" ")[0];
+              const match = Object.keys(rentalTherapistMap).find(k => k.split(" ")[0] === firstName && k.split(" ").length > 1);
+              if (match) actualRevenue = rentalTherapistMap[match];
+            }
+            const acqCost = t.leads * COST_PER_LEAD;
+            return {
+              ...t,
+              acqCost,
+              bayviewRevenue: actualRevenue,
+              profit: actualRevenue - acqCost,
+              roi: acqCost > 0 ? Math.round(((actualRevenue - acqCost) / acqCost) * 100) : 0,
+            };
+          });
+        }, [stats.team, rentalTherapistMap]);
+
+        const totalAcq = teamWithFinancials.reduce((s, t) => s + t.acqCost, 0);
 
   // Date range labels
   const dateLabels = {
@@ -481,7 +504,7 @@ function BayviewDashboard() {
             </div>
 
             {/* Therapist Revenue & Acquisition */}
-            <ChartCard title="💰 Therapist Revenue & Acquisition" subtitle={`$${COST_PER_LEAD}/lead acquisition · $${REVENUE_PER_BOOKED}/booked client revenue`} style={{ marginBottom: 16 }}>
+            <ChartCard title="💰 Therapist Revenue & Acquisition" subtitle={`$${COST_PER_LEAD}/lead · Bayview Lead Cost — actual room rental revenue`} style={{ marginBottom: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginTop: 8 }}>
                 {teamWithFinancials.slice(0, 20).map((t) => (
                   <div key={t.name} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
@@ -496,8 +519,8 @@ function BayviewDashboard() {
                       <div style={{ marginLeft: "auto", textAlign: "right" }}><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5 }}>ROI</div><div style={{ fontSize: 16, fontWeight: 700, color: t.roi >= 0 ? C.accent : C.rose }}>{t.roi}%</div></div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 4 }}>
-                      <div style={{ fontSize: 11, color: C.rose }}><span style={{ color: C.textMuted }}>Cost: </span>{fmtCurrency(t.acqCost)}</div>
-                      <div style={{ fontSize: 11, color: C.accent }}><span style={{ color: C.textMuted }}>Revenue: </span>{fmtCurrency(t.estRevenue)}</div>
+              <div style={{ fontSize: 11, color: C.rose }}><span style={{ color: C.textMuted }}>Lead Cost: </span>{fmtCurrency(t.acqCost)}</div>
+              <div style={{ fontSize: 11, color: C.accent }}><span style={{ color: C.textMuted }}>Bayview Rev: </span>{fmtCurrency(t.bayviewRevenue)}</div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: t.profit >= 0 ? C.accent : C.rose }}>{t.profit >= 0 ? "+" : ""}{fmtCurrency(t.profit)}</div>
                     </div>
                   </div>
