@@ -160,6 +160,17 @@ function BayviewDashboard() {
         const [loadingRecent, setLoadingRecent] = useState(false);
         const [editingLeadId, setEditingLeadId] = useState(null);
         const [leadRefreshKey, setLeadRefreshKey] = useState(0);
+        const [dataVersion, setDataVersion] = useState(0);
+        const refreshDashboardData = () => {
+          fetch("/api/refresh", {method:"POST"}).then(() => {
+            const reFetch = () => fetch("/api/data").then(r => r.json()).then(d => {
+              PRECOMPUTED = d;
+              setDataVersion(v => v + 1);
+            }).catch(() => {});
+            setTimeout(reFetch, 6000);
+            setTimeout(reFetch, 12000);
+          }).catch(() => {});
+        };
 
         const LOCATIONS = ["Fort Lauderdale", "Coral Springs", "Plantation", "Telehealth", "Referred Out"];
         const SERVICE_TYPES = ["Individual Therapy", "Couples Therapy", "Family Therapy", "Adolescent Therapy", "Group Therapy", "Child Therapy", "Supervision", "Psychological Evaluation", "Christian Based Counseling", "Testing Evaluation", "CogScreen", "Psychiatric", "Mental Health Match"];
@@ -206,6 +217,7 @@ function BayviewDashboard() {
                         setEditingLeadId(null);
                         setIntakeForm({date: new Date().toISOString().split('T')[0], location:'', first_name:'', last_name:'', phone:'', email:'', service_type:'', presenting_problem:'', referral_source:'', action_taken:'', referred_to:'', marketing_program:'No', referral_outcome:'', notes:''});
                         setLeadRefreshKey(k => k + 1);
+                        refreshDashboardData();
                     } else { setIntakeMsg({type:"error",text:d.error || "Update failed"}); }
                 }).catch(() => setIntakeMsg({type:"error",text:"Network error"}));
             } else {
@@ -215,6 +227,7 @@ function BayviewDashboard() {
                         setIntakeMsg({type:"success",text:"Lead #" + d.id + " saved!"});
                         setIntakeForm({date: new Date().toISOString().split('T')[0], location:'', first_name:'', last_name:'', phone:'', email:'', service_type:'', presenting_problem:'', referral_source:'', action_taken:'', referred_to:'', marketing_program:'No', referral_outcome:'', notes:''});
                         setLeadRefreshKey(k => k + 1);
+                        refreshDashboardData();
                     } else { setIntakeMsg({type:"error",text:d.error || "Save failed"}); }
                 }).catch(() => setIntakeMsg({type:"error",text:"Network error"}));
             }
@@ -222,7 +235,7 @@ function BayviewDashboard() {
 
         const updatePendingLead = (id, field, value) => {
           fetch("/api/leads/" + id, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({[field]: value})})
-            .then(r => r.json()).then(() => setLeadRefreshKey(k => k + 1));
+            .then(r => r.json()).then(() => { setLeadRefreshKey(k => k + 1); refreshDashboardData(); });
         };
 
   const [activeTab, setActiveTab] = useState("overview");
