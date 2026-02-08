@@ -18,7 +18,7 @@ logger = logging.getLogger("bayview")
 app = Flask(__name__, static_folder="static")
 
 # ── Database ─────────────────────────────────────────────────────────────────
-from database import init_db, add_lead, update_lead, get_pending_leads, get_recent_leads, get_lead
+from database import init_db, add_lead, update_lead, get_pending_leads, get_recent_leads, get_lead, delete_lead
 init_db()
 
 # ── State ────────────────────────────────────────────────────────────────────
@@ -202,6 +202,14 @@ def api_get_lead(lead_id):
     if not lead:
         return jsonify({"error": "Lead not found"}), 404
     return jsonify(lead)
+
+@app.route("/api/leads/<int:lead_id>", methods=["DELETE"])
+def api_delete_lead(lead_id):
+    lead = get_lead(lead_id)
+    if not lead:
+        return jsonify({"error": "Lead not found"}), 404
+    delete_lead(lead_id)
+    return jsonify({"ok": True, "deleted": lead_id})
 
 
 # ── Startup ──────────────────────────────────────────────────────────────────
