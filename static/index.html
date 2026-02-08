@@ -183,38 +183,57 @@ function BayviewDashboard() {
   }, [stats, useMonthly]);
 
         // Enrich team with financials - using actual rental revenue
+        // Name alias map for known mismatches between rental and team data
+        const NAME_ALIASES = {
+          'tahnnee m': 'tahnee m',
+          'tatiana st': 'tatiana s',
+          'dr jeffrey': 'dr jeffrey m',
+          'heather v': 'dr heather v',
+          'dr halle r': 'dr halle s',
+          'jen p': 'jen r'
+        };
         const rentalTherapistMap = useMemo(() => {
           const R = PRECOMPUTED._rental || {};
           const periodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisMonthTherapists", today: "thisMonthTherapists", all: "therapists", lastyear: "lyTherapists" };
           const therapistList = R[periodMap[timeFilter]] || R.therapists || [];
           const norm = (n) => n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+          const stripDr = (n) => n.replace(/^dr\s+/, "");
           const map = {};
           therapistList.forEach(t => {
+            if (t.name.toLowerCase().startsWith('testing')) return;
             const key = norm(t.name);
-            map[key] = (map[key] || 0) + t.total;
+            const resolved = NAME_ALIASES[key] || key;
+            map[resolved] = (map[resolved] || 0) + t.total;
+            const noDr = stripDr(resolved);
+            if (noDr !== resolved) {
+              map[noDr] = (map[noDr] || 0) + t.total;
+            }
           });
           return map;
         }, [timeFilter]);
 
         const teamWithFinancials = useMemo(() => {
           const norm = (n) => n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+          const stripDr = (n) => n.replace(/^dr\s+/, "");
           return stats.team.map(t => {
             const key = norm(t.name);
-            // Try direct match, then first-name match
             let actualRevenue = rentalTherapistMap[key] || 0;
             if (!actualRevenue) {
-              const firstName = key.split(" ")[0];
-              const match = Object.keys(rentalTherapistMap).find(k => k.split(" ")[0] === firstName && k.split(" ").length > 1);
-              if (match) actualRevenue = rentalTherapistMap[match];
+              actualRevenue = rentalTherapistMap[stripDr(key)] || 0;
+            }
+            if (!actualRevenue) {
+              const parts = key.replace(/^dr\s+/, '').split(' ');
+              if (parts.length >= 2) {
+                const firstChar = parts[parts.length - 1][0];
+                const matchKey = Object.keys(rentalTherapistMap).find(k => {
+                  const kParts = k.replace(/^dr\s+/, '').split(' ');
+                  return kParts.length >= 2 && kParts[0] === parts[0] && kParts[kParts.length - 1][0] === firstChar;
+                });
+                if (matchKey) actualRevenue = rentalTherapistMap[matchKey];
+              }
             }
             const acqCost = t.leads * COST_PER_LEAD;
-            return {
-              ...t,
-              acqCost,
-              bayviewRevenue: actualRevenue,
-              profit: actualRevenue - acqCost,
-              roi: acqCost > 0 ? Math.round(((actualRevenue - acqCost) / acqCost) * 100) : 0,
-            };
+            return { ...t, acqCost, bayviewRevenue: actualRevenue, profit: actualRevenue - acqCost, roi: acqCost > 0 ? Math.round(((actualRevenue - acqCost) / acqCost) * 100) : 0 };
           });
         }, [stats.team, rentalTherapistMap]);
 
