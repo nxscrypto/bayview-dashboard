@@ -384,20 +384,32 @@ def process_rental(rows):
             summary_cols["ftl"] = i
         elif h == "Plantation":
             summary_cols["pl"] = i
-        elif i >= 2 and i < summary_cols.get("gt", 999):
+        elif i >= 2:
+            # Skip summary columns
+            if h in ("Grand Total", "Marketing Total", "Testing", "Coral Springs", "Fort Lauderdale", "Plantation"):
+                continue
+            # Skip supervisor/fixed/open/empty columns
+            if "- Sup" in h or "- Fixed" in h or h.startswith("Open") or not h.strip():
+                continue
+            # Determine location and strip prefix
             loc = "FTL"
-            if h.startswith("CS:"):
-                loc = "CS"
-            elif h.startswith("PL:"):
-                loc = "PL"
             name = h
-            for pfx in ("FTL: ", "CS: ", "PL: ", "FTL:", "CS:", "PL:"):
+            if h.startswith("CS:") or h.startswith("CS "):
+                loc = "CS"
+            elif h.startswith("PL:") or h.startswith("PL "):
+                loc = "PL"
+            elif h.startswith("Testing:") or h.startswith("Testing "):
+                loc = "Testing"
+            elif h.startswith("M-") or h.startswith("Mark-"):
+                loc = "MKT"
+            for pfx in ("FTL: ", "CS: ", "PL: ", "FTL:", "CS:", "PL:", "Testing: ", "Testing:", "Mark-", "M-"):
                 if h.startswith(pfx):
                     name = h[len(pfx):].strip()
                     break
-            if not name.startswith("M-") and not name.startswith("Mark-") and not name.startswith("Open") \
-                    and name not in ("", "3", "4", "5", "6", "7", "8"):
-                therapist_cols.append({"idx": i, "col": h, "name": name, "loc": loc})
+            # Skip if name is empty or just a number after prefix stripping
+            if not name or name in ("3", "4", "5", "6", "7", "8"):
+                continue
+            therapist_cols.append({"idx": i, "col": h, "name": name, "loc": loc})
 
     weekly = []
     all_therapist_totals = defaultdict(float)
