@@ -854,7 +854,7 @@ function BayviewDashboard() {
                           <td style={{padding:"8px 6px", color:C.textMuted, maxWidth:120, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.service_type}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted}}>{lead.location}</td>
                           <td style={{padding:"8px 6px", color: daysAgo >= 10 ? C.rose : daysAgo >= 5 ? C.yellow : C.accent, fontWeight:700}}>{daysAgo}d</td>
-                          <td style={{padding:"8px 6px"}}><select value={lead.referred_to} onChange={e => updatePendingLead(lead.id, "referred_to", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: lead.referred_to === "Pending" ? C.yellow : C.accent, fontSize:11, maxWidth:130}}><option value="Pending">Pending</option>{THERAPISTS.filter(t => t !== "Pending").map(t => <option key={t} value={t}>{t}</option>)}</select></td>
+                          <td style={{padding:"8px 6px"}}><select value={lead.referred_to} onChange={e => updatePendingLead(lead.id, "referred_to", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: C.text, fontSize:11, maxWidth:130}}><option value="Pending">Pending</option>{THERAPISTS.filter(t => t !== "Pending").map(t => <option key={t} value={t}>{t}</option>)}</select></td>
                           <td style={{padding:"8px 6px"}}><select value={lead.referral_outcome} onChange={e => updatePendingLead(lead.id, "referral_outcome", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" ? C.rose : C.text, fontSize:11}}>{OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}</select></td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.notes}</td>
                         </tr>;
@@ -888,7 +888,7 @@ function BayviewDashboard() {
                           <td style={{padding:"8px 6px", color:C.textMuted, whiteSpace:"nowrap"}}>{lead.phone}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted}}>{lead.location}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted, maxWidth:120, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.service_type}</td>
-                          <td style={{padding:"8px 6px", color: lead.referred_to === "Pending" ? C.yellow : C.accent, fontWeight:600}}>{lead.referred_to}</td>
+                          <td style={{padding:"8px 6px", color: C.text, fontWeight:600}}>{lead.referred_to}</td>
                           <td style={{padding:"8px 6px", color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" || lead.referral_outcome === "Cancelled" ? C.rose : C.textMuted}}>{lead.referral_outcome}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11}}>{lead.referral_source}</td>
                         </tr>
