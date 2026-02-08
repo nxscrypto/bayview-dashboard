@@ -190,52 +190,82 @@ function BayviewDashboard() {
           'dr jeffrey': 'dr jeffrey m',
           'heather v': 'dr heather v',
           'dr halle r': 'dr halle s',
-          'jen p': 'jen r'
+          'jen p': 'jen r',
+          'brittany m': 'dr brittany'
         };
-        const rentalTherapistMap = useMemo(() => {
+        const MKT_ALIASES = {
+          'dr jeff': 'dr jeffrey m',
+          'heather kuhl': 'dr heather k',
+          'sheilah ladesma': 'sheilah l',
+          'jonathan stiglich': 'jonathan s',
+          'cadace': 'candace n',
+          'lia': 'lia d'
+        };
+        const norm = (n) => n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+        const stripDr = (n) => n.replace(/^dr\s+/, "");
+
+        // Build a map helper function
+        const buildTherapistMap = (listKey, periodMap, aliases) => {
           const R = PRECOMPUTED._rental || {};
-          const periodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisMonthTherapists", today: "thisMonthTherapists", all: "therapists", lastyear: "lyTherapists" };
-          const therapistList = R[periodMap[timeFilter]] || R.therapists || [];
-          const norm = (n) => n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
-          const stripDr = (n) => n.replace(/^dr\s+/, "");
+          const therapistList = R[listKey] || [];
           const map = {};
           therapistList.forEach(t => {
             if (t.name.toLowerCase().startsWith('testing')) return;
             const key = norm(t.name);
-            const resolved = NAME_ALIASES[key] || key;
+            const resolved = aliases[key] || key;
             map[resolved] = (map[resolved] || 0) + t.total;
             const noDr = stripDr(resolved);
-            if (noDr !== resolved) {
-              map[noDr] = (map[noDr] || 0) + t.total;
-            }
+            if (noDr !== resolved) map[noDr] = (map[noDr] || 0) + t.total;
           });
           return map;
-        }, [timeFilter]);
+        };
+
+        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisMonthTherapists", today: "thisMonthTherapists", all: "therapists", lastyear: "lyTherapists" };
+        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisMonthTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists" };
+        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisMonthTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists" };
+
+        const rentalTherapistMap = useMemo(() => buildTherapistMap(rentalPeriodMap[timeFilter] || "therapists", rentalPeriodMap, NAME_ALIASES), [timeFilter]);
+        const mktTherapistMap = useMemo(() => buildTherapistMap(mktPeriodMap[timeFilter] || "mktTherapists", mktPeriodMap, {...NAME_ALIASES, ...MKT_ALIASES}), [timeFilter]);
+        const testTherapistMap = useMemo(() => buildTherapistMap(testPeriodMap[timeFilter] || "testTherapists", testPeriodMap, NAME_ALIASES), [timeFilter]);
+
+        // Match a team member name against a revenue map
+        const matchRevenue = (teamName, revenueMap) => {
+          const key = norm(teamName);
+          let rev = revenueMap[key] || 0;
+          if (!rev) rev = revenueMap[stripDr(key)] || 0;
+          if (!rev) {
+            // First-name only match (for MKT short names like "Carla", "Jackie")
+            const parts = key.replace(/^dr\s+/, '').split(' ');
+            const firstName = parts[0];
+            // Find all keys that start with this first name
+            const matches = Object.keys(revenueMap).filter(k => {
+              const kFirst = k.replace(/^dr\s+/, '').split(' ')[0];
+              return kFirst === firstName;
+            });
+            if (matches.length === 1) rev = revenueMap[matches[0]];
+            else if (matches.length > 1 && parts.length >= 2) {
+              // Try first name + first char of last
+              const lastChar = parts[parts.length - 1][0];
+              const exactMatch = matches.find(k => {
+                const kParts = k.replace(/^dr\s+/, '').split(' ');
+                return kParts.length >= 2 && kParts[kParts.length - 1][0] === lastChar;
+              });
+              if (exactMatch) rev = revenueMap[exactMatch];
+            }
+          }
+          return rev;
+        };
 
         const teamWithFinancials = useMemo(() => {
-          const norm = (n) => n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
-          const stripDr = (n) => n.replace(/^dr\s+/, "");
           return stats.team.map(t => {
-            const key = norm(t.name);
-            let actualRevenue = rentalTherapistMap[key] || 0;
-            if (!actualRevenue) {
-              actualRevenue = rentalTherapistMap[stripDr(key)] || 0;
-            }
-            if (!actualRevenue) {
-              const parts = key.replace(/^dr\s+/, '').split(' ');
-              if (parts.length >= 2) {
-                const firstChar = parts[parts.length - 1][0];
-                const matchKey = Object.keys(rentalTherapistMap).find(k => {
-                  const kParts = k.replace(/^dr\s+/, '').split(' ');
-                  return kParts.length >= 2 && kParts[0] === parts[0] && kParts[kParts.length - 1][0] === firstChar;
-                });
-                if (matchKey) actualRevenue = rentalTherapistMap[matchKey];
-              }
-            }
+            const bayviewRevenue = matchRevenue(t.name, rentalTherapistMap);
+            const mktRevenue = matchRevenue(t.name, mktTherapistMap);
+            const testRevenue = matchRevenue(t.name, testTherapistMap);
+            const totalRevenue = bayviewRevenue + mktRevenue + testRevenue;
             const acqCost = t.leads * COST_PER_LEAD;
-            return { ...t, acqCost, bayviewRevenue: actualRevenue, profit: actualRevenue - acqCost, roi: acqCost > 0 ? Math.round(((actualRevenue - acqCost) / acqCost) * 100) : 0 };
+            return { ...t, acqCost, bayviewRevenue, mktRevenue, testRevenue, totalRevenue, profit: totalRevenue - acqCost, roi: acqCost > 0 ? Math.round(((totalRevenue - acqCost) / acqCost) * 100) : 0 };
           });
-        }, [stats.team, rentalTherapistMap]);
+        }, [stats.team, rentalTherapistMap, mktTherapistMap, testTherapistMap]);
 
         const totalAcq = teamWithFinancials.reduce((s, t) => s + t.acqCost, 0);
 
@@ -523,7 +553,7 @@ function BayviewDashboard() {
             </div>
 
             {/* Therapist Revenue & Acquisition */}
-            <ChartCard title="💰 Therapist Revenue & Acquisition" subtitle={`$${COST_PER_LEAD}/lead · Bayview Lead Cost — actual room rental revenue`} style={{ marginBottom: 16 }}>
+            <ChartCard title="💰 Therapist Revenue & Acquisition" subtitle={`$${COST_PER_LEAD}/lead · Bayview Lead Cost — room rental + marketing + testing revenue`} style={{ marginBottom: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginTop: 8 }}>
                 {teamWithFinancials.slice(0, 20).map((t) => (
                   <div key={t.name} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
@@ -539,7 +569,9 @@ function BayviewDashboard() {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 4 }}>
               <div style={{ fontSize: 11, color: C.rose }}><span style={{ color: C.textMuted }}>Lead Cost: </span>{fmtCurrency(t.acqCost)}</div>
-              <div style={{ fontSize: 11, color: C.accent }}><span style={{ color: C.textMuted }}>Bayview Rev: </span>{fmtCurrency(t.bayviewRevenue)}</div>
+              <div style={{ fontSize: 11, color: C.accent }}><span style={{ color: C.textMuted }}>Room Rev: </span>{fmtCurrency(t.bayviewRevenue)}</div>
+              {t.mktRevenue > 0 && <div style={{ fontSize: 11, color: '#A78BFA' }}><span style={{ color: C.textMuted }}>Mkt Rev: </span>{fmtCurrency(t.mktRevenue)}</div>}
+              {t.testRevenue > 0 && <div style={{ fontSize: 11, color: '#60A5FA' }}><span style={{ color: C.textMuted }}>Test Rev: </span>{fmtCurrency(t.testRevenue)}</div>}
                       <div style={{ fontSize: 11, fontWeight: 700, color: t.profit >= 0 ? C.accent : C.rose }}>{t.profit >= 0 ? "+" : ""}{fmtCurrency(t.profit)}</div>
                     </div>
                   </div>
