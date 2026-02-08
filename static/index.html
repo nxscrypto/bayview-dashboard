@@ -151,8 +151,6 @@ function BayviewDashboard() {
     { id: "overview", label: "Overview" },
     { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
-    { id: "forecast", label: "Forecast" },
-    { id: "trends", label: "Trends" },
   ];
   const filterBtns = [
     { id: "ytd", label: "Year-to-Date" },
@@ -263,9 +261,9 @@ function BayviewDashboard() {
       {/* ─── CONTENT ─── */}
       <div style={{ padding: "24px 28px", maxWidth: 1440, margin: "0 auto" }} className="animate-in" key={timeFilter + activeTab}>
 
-        {/* ═══ OVERVIEW TAB ═══ */}
-        {activeTab === "overview" && (
-          <>
+          {/* ═══ OVERVIEW TAB ═══ */}
+          {activeTab === "overview" && (
+            <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, marginBottom: 24 }}>
               <StatCard label="Total Leads" value={stats.total} icon="📊" color={C.blue} sub={`${stats.daily.length} active days`} prev={prev?.total} prevLabel={prevLabel} />
               <StatCard label="Booked" value={stats.booked} icon="✓" color={C.accent} sub={`${stats.bookingRate}% conversion`} prev={prev?.booked} prevLabel={prevLabel} />
@@ -291,17 +289,87 @@ function BayviewDashboard() {
                 </ResponsiveContainer>
               </ChartCard>
 
-              <ChartCard title="Leads by Location" subtitle="Office distribution">
+              <ChartCard title="Leads vs Booked by Location" subtitle="Conversion by office">
                 <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={stats.locations} margin={{ left: 10, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<Tip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="leads" name="Leads" fill={C.blue} radius={[4, 4, 0, 0]} barSize={24} />
+                    <Bar dataKey="booked" name="Booked" fill={C.accent} radius={[4, 4, 0, 0]} barSize={24} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <ChartCard title="Cumulative Leads vs Booked" subtitle="Running totals — gap = unconverted pipeline">
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={cumulative}>
+                    <defs>
+                      <linearGradient id="gcL" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.blue} stopOpacity={0.3} /><stop offset="100%" stopColor={C.blue} stopOpacity={0.02} /></linearGradient>
+                      <linearGradient id="gcB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.accent} stopOpacity={0.3} /><stop offset="100%" stopColor={C.accent} stopOpacity={0.02} /></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<Tip />} />
+                    <Area type="monotone" dataKey="cLeads" name="Cumulative Leads" stroke={C.blue} fill="url(#gcL)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="cBooked" name="Cumulative Booked" stroke={C.accent} fill="url(#gcB)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Action Taken" subtitle="How leads are being processed">
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
-                    <Pie data={stats.locations} dataKey="leads" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} label={({ name, leads }) => `${name} (${leads.toLocaleString()})`} labelLine={{ stroke: C.textDim }} style={{ fontSize: 10 }}>
-                      {stats.locations.map((l, i) => <Cell key={i} fill={LOC_COLORS[l.name] || CHART_COLORS[i % CHART_COLORS.length]} />)}
+                    <Pie data={stats.actions} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} label={({ name, count }) => `${name} (${count.toLocaleString()})`} labelLine={{ stroke: C.textDim }} style={{ fontSize: 9 }}>
+                      {stats.actions.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                     </Pie>
                     <Tooltip content={<Tip />} />
                   </PieChart>
                 </ResponsiveContainer>
               </ChartCard>
             </div>
+
+            <ChartCard title="Conversion Rate by Location" subtitle="Booking percentage per office">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>
+                {stats.locations.map(loc => {
+                  const rate = loc.leads > 0 ? Math.round(loc.booked / loc.leads * 100) : 0;
+                  return (
+                    <div key={loc.name} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{loc.name}</span>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: rate >= 35 ? C.accent : rate >= 20 ? C.warm : C.rose }}>{rate}%</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>{loc.leads.toLocaleString()} leads → {loc.booked.toLocaleString()} booked</div>
+                      <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${rate}%`, background: rate >= 35 ? C.accent : rate >= 20 ? C.warm : C.rose, borderRadius: 2 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ChartCard>
+
+            {/* Yearly trend */}
+            {stats.yearly.length > 1 && (
+              <ChartCard title="📈 Year-over-Year Growth" subtitle="Annual lead volume and bookings" style={{ marginBottom: 16 }}>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={stats.yearly}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: C.textMuted }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<Tip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="leads" name="Leads" fill={C.blue} radius={[4, 4, 0, 0]} barSize={30} />
+                    <Bar dataKey="booked" name="Booked" fill={C.accent} radius={[4, 4, 0, 0]} barSize={30} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <ChartCard title="Services Requested" subtitle="Types of therapy being sought">
@@ -332,8 +400,8 @@ function BayviewDashboard() {
                 </ResponsiveContainer>
               </ChartCard>
             </div>
-          </>
-        )}
+            </>
+          )}
 
 
         {/* ═══ TEAM TAB ═══ */}
@@ -588,146 +656,6 @@ function BayviewDashboard() {
           );
         })()}
 
-        {/* ═══ FORECAST TAB ═══ */}
-        {activeTab === "forecast" && (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-              <StatCard label="Total Leads" value={stats.total} icon="📊" color={C.blue} sub="In selected period" prev={prev?.total} prevLabel={prevLabel} />
-              <StatCard label="Total Booked" value={stats.booked} icon="✓" color={C.accent} sub={`${stats.bookingRate}% conversion`} prev={prev?.booked} prevLabel={prevLabel} />
-              <StatCard label="Never Booked" value={stats.total - stats.booked} icon="✗" color={C.rose} sub={`${100 - stats.bookingRate}% of leads`} prev={prev ? prev.total - prev.booked : null} prevLabel={prevLabel} />
-              <StatCard label="Avg/Month" value={stats.monthly.length ? Math.round(stats.total / stats.monthly.length) : 0} icon="📈" color={C.purple} sub="Leads per month" />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-              <ChartCard title="Cumulative Leads vs Booked" subtitle="Running totals — gap = unconverted pipeline">
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={cumulative}>
-                    <defs>
-                      <linearGradient id="gcL" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.blue} stopOpacity={0.3} /><stop offset="100%" stopColor={C.blue} stopOpacity={0.02} /></linearGradient>
-                      <linearGradient id="gcB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.accent} stopOpacity={0.3} /><stop offset="100%" stopColor={C.accent} stopOpacity={0.02} /></linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<Tip />} />
-                    <Area type="monotone" dataKey="cLeads" name="Cumulative Leads" stroke={C.blue} fill="url(#gcL)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="cBooked" name="Cumulative Booked" stroke={C.accent} fill="url(#gcB)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              <ChartCard title="Leads vs Booked by Location" subtitle="Conversion by office">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={stats.locations} margin={{ left: 10, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<Tip />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="leads" name="Leads" fill={C.blue} radius={[4, 4, 0, 0]} barSize={24} />
-                    <Bar dataKey="booked" name="Booked" fill={C.accent} radius={[4, 4, 0, 0]} barSize={24} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </div>
-
-            {/* Yearly trend */}
-            {stats.yearly.length > 1 && (
-              <ChartCard title="📈 Year-over-Year Growth" subtitle="Annual lead volume and bookings" style={{ marginBottom: 16 }}>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={stats.yearly}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<Tip />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="leads" name="Leads" fill={C.blue} radius={[4, 4, 0, 0]} barSize={30} />
-                    <Bar dataKey="booked" name="Booked" fill={C.accent} radius={[4, 4, 0, 0]} barSize={30} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-
-            {/* Location conversion rates */}
-            <ChartCard title="Conversion Rate by Location" subtitle="Booking percentage per office">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>
-                {stats.locations.map(loc => {
-                  const rate = loc.leads > 0 ? Math.round(loc.booked / loc.leads * 100) : 0;
-                  return (
-                    <div key={loc.name} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{loc.name}</span>
-                        <span style={{ fontSize: 16, fontWeight: 700, color: rate >= 35 ? C.accent : rate >= 20 ? C.warm : C.rose }}>{rate}%</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>{loc.leads.toLocaleString()} leads → {loc.booked.toLocaleString()} booked</div>
-                      <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${rate}%`, background: rate >= 35 ? C.accent : rate >= 20 ? C.warm : C.rose, borderRadius: 2 }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ChartCard>
-          </>
-        )}
-
-        {/* ═══ TRENDS TAB ═══ */}
-        {activeTab === "trends" && (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-              <StatCard label="Monthly Average" value={stats.monthly.length ? Math.round(stats.total / stats.monthly.length) : 0} icon="📊" color={C.blue} sub="Leads per month" />
-              <StatCard label="Best Month" value={stats.monthly.length ? (() => { const best = stats.monthly.reduce((a, b) => b.leads > a.leads ? b : a); return fmtMonth(best.month); })() : "—"} icon="🏆" color="#FFD700" sub={`${stats.monthly.length ? stats.monthly.reduce((a, b) => b.leads > a.leads ? b : a).leads.toLocaleString() : 0} leads`} />
-              <StatCard label="Booking Rate" value={`${stats.bookingRate}%`} icon="✓" color={C.accent} sub={`${stats.booked.toLocaleString()} of ${stats.total.toLocaleString()}`} />
-              <StatCard label="Never Booked" value={stats.total - stats.booked} icon="✗" color={C.rose} sub={`${100 - stats.bookingRate}% of leads`} />
-            </div>
-
-            <ChartCard title={useMonthly ? "Monthly Lead Trends" : "Daily Lead Trends"} subtitle="Leads vs booked over time" style={{ marginBottom: 16 }}>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} interval={useMonthly ? 0 : Math.floor(chartData.length / 10)} angle={useMonthly ? -45 : 0} textAnchor={useMonthly ? "end" : "middle"} height={useMonthly ? 50 : 30} />
-                  <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<Tip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="leads" name="Leads" fill={C.blue} radius={[3, 3, 0, 0]} barSize={useMonthly ? 14 : 8} />
-                  <Bar dataKey="booked" name="Booked" fill={C.accent} radius={[3, 3, 0, 0]} barSize={useMonthly ? 14 : 8} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <ChartCard title="Action Taken" subtitle="How leads are being processed">
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie data={stats.actions} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} label={({ name, count }) => `${name} (${count.toLocaleString()})`} labelLine={{ stroke: C.textDim }} style={{ fontSize: 9 }}>
-                      {stats.actions.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip content={<Tip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              <ChartCard title="Location Trends Over Time" subtitle="Monthly volume by office">
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={stats.monthly.map(m => {
-                    const row = { month: fmtMonth(m.month) };
-                    // We don't have per-location monthly data in precomputed, show total
-                    row.leads = m.leads;
-                    row.booked = m.booked;
-                    return row;
-                  })}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                    <XAxis dataKey="month" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<Tip />} />
-                    <Area type="monotone" dataKey="leads" name="Leads" stroke={C.blue} fill={`${C.blue}20`} strokeWidth={2} />
-                    <Area type="monotone" dataKey="booked" name="Booked" stroke={C.accent} fill={`${C.accent}20`} strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </div>
-          </>
-        )}
       </div>
 
       {/* ─── FOOTER ─── */}
