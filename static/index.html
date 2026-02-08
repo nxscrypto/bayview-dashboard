@@ -177,13 +177,17 @@ function BayviewDashboard() {
                 setLoadingPending(true);
                 setLoadingRecent(true);
                 fetch("/api/leads/pending?days=14").then(r => r.json()).then(data => {
-                    setPendingLeads(Array.isArray(data) ? data : []);
+                    const arr = Array.isArray(data) ? data : [];
+                    window._dbgPending = arr;
+                    setPendingLeads(arr);
                     setLoadingPending(false);
-                }).catch(() => setLoadingPending(false));
+                }).catch(e => { window._dbgPendingErr = e.message; setLoadingPending(false); });
                 fetch("/api/leads/recent?days=30").then(r => r.json()).then(data => {
-                    setRecentLeads(Array.isArray(data) ? data : []);
+                    const arr = Array.isArray(data) ? data : [];
+                    window._dbgRecent = arr;
+                    setRecentLeads(arr);
                     setLoadingRecent(false);
-                }).catch(() => setLoadingRecent(false));
+                }).catch(e => { window._dbgRecentErr = e.message; setLoadingRecent(false); });
             }
         }, [activeTab, leadRefreshKey]);
 
