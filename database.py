@@ -125,6 +125,18 @@ def get_pending_leads(days=14):
     return [dict(r) for r in rows]
 
 
+def get_recent_leads(days=30):
+    """Return all leads from the last N days."""
+    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT * FROM leads
+            WHERE date >= ?
+            ORDER BY date DESC, created_at DESC
+        """, (cutoff,)).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_all_leads():
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM leads ORDER BY date DESC, created_at DESC").fetchall()
