@@ -19,6 +19,7 @@ app = Flask(__name__, static_folder="static")
 
 # ── Database ─────────────────────────────────────────────────────────────────
 from database import init_db, add_lead, update_lead, get_pending_leads, get_recent_leads, get_lead, delete_lead
+from calendar_sync import get_sessions_data
 init_db()
 
 # ── State ────────────────────────────────────────────────────────────────────
@@ -211,6 +212,20 @@ def api_delete_lead(lead_id):
     delete_lead(lead_id)
     return jsonify({"ok": True, "deleted": lead_id})
 
+
+
+# ── Sessions API ─────────────────────────────────────────────────────────────
+@app.route("/api/sessions")
+def api_sessions():
+    weeks_back = request.args.get("weeks", 8, type=int)
+    if weeks_back > 52:
+        weeks_back = 52
+    try:
+        data = get_sessions_data(weeks_back)
+        return jsonify(data)
+    except Exception as e:
+        logger.exception("Sessions fetch failed")
+        return jsonify({"error": str(e)}), 500
 
 # ── Startup ──────────────────────────────────────────────────────────────────
 port = int(os.environ.get("PORT", 8080))
