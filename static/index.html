@@ -216,7 +216,7 @@ function BayviewDashboard() {
     const [editingRentalWeek, setEditingRentalWeek] = useState(null);
 
     // Session data cache for rental auto-population
-    const [rentalSessionsCache, setRentalSessionsCache] = React.useState(null);
+    const rentalSessionsRef = React.useRef(null);
     const [rentalSessionsLoading, setRentalSessionsLoading] = React.useState(false);
 
     // Map full location names to rental codes
@@ -240,16 +240,15 @@ function BayviewDashboard() {
     };
 
     // Fetch session data for rental auto-population
+    // Fetch session data for rental auto-population
     const fetchRentalSessions = () => {
-      console.log('[RENTAL] fetchRentalSessions called');
-      if (rentalSessionsCache) return Promise.resolve(rentalSessionsCache);
+      if (rentalSessionsRef.current) return Promise.resolve(rentalSessionsRef.current);
       setRentalSessionsLoading(true);
       return fetch('/api/sessions?weeks=1')
         .then(r => r.json())
         .then(data => {
-          console.log('[RENTAL] fetch resolved, data keys:', Object.keys(data));
           const summary = data.therapist_summary || [];
-          setRentalSessionsCache(summary);
+          rentalSessionsRef.current = summary;
           setRentalSessionsLoading(false);
           return summary;
         })
@@ -261,8 +260,8 @@ function BayviewDashboard() {
     };
 
     // Handle therapist selection - auto-populate location rows with session counts
+    // Handle therapist selection - auto-populate location rows with session counts
     const handleTherapistSelect = (idx, value) => {
-      console.log('[RENTAL] handleTherapistSelect called:', idx, value);
       updateRentalRow(idx, "therapist", value);
       if (!value) return;
       const doPopulate = (summary) => {
@@ -276,26 +275,36 @@ function BayviewDashboard() {
           merged[code] = (merged[code] || 0) + count;
         }
         const locEntries = Object.entries(merged);
-        console.log('[RENTAL] locEntries:', JSON.stringify(locEntries));
         setRentalForm(f => {
-          console.log('[RENTAL] inside setRentalForm, f.entries:', f.entries.length);
           const newEntries = [...f.entries];
           newEntries[idx] = {...newEntries[idx], therapist: value, location: locEntries[0][0], sessions: String(locEntries[0][1])};
           for (let i = 1; i < locEntries.length; i++) {
             newEntries.splice(idx + i, 0, {therapist: value, location: locEntries[i][0], sessions: String(locEntries[i][1]), amount_room: '', amount_mkt: '', amount_test: '', notes: ''});
           }
-          console.log('[RENTAL] newEntries sessions:', newEntries.map(e => e.sessions));
           return {...f, entries: newEntries};
         });
       };
+      // Use ref for synchronous cache check
+      if (rentalSessionsRef.current) {
+        doPopulate(rentalSessionsRef.current);
+      } else {
+        fetchRentalSessions().then(function(summary) { doPopulate(summary); });
+      }
+    };
       if (rentalSessionsCache) {
-      console.log('[RENTAL] about to check cache, cache is:', rentalSessionsCache);
         doPopulate(rentalSessionsCache);
       } else {
         fetchRentalSessions().then(summary => doPopulate(summary));
       }
     };
 
+
+    // Preload session data when component mounts
+    React.useEffect(() => {
+      if (!rentalSessionsRef.current) {
+        fetchRentalSessions();
+      }
+    }, []);
     const RENTAL_LOCATIONS = ["FTL", "CS", "PL", "Testing", "MKT"];
     const RENTAL_CATEGORIES = ["room_rental", "marketing", "testing"];
 
