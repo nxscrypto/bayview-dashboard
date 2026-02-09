@@ -161,6 +161,10 @@ function BayviewDashboard() {
         const [editingLeadId, setEditingLeadId] = useState(null);
         const [leadRefreshKey, setLeadRefreshKey] = useState(0);
         const [dataVersion, setDataVersion] = useState(0);
+  const [sessionsData, setSessionsData] = useState(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsWeekIdx, setSessionsWeekIdx] = useState(null);
+  const [sessionsExpanded, setSessionsExpanded] = useState({});
         const refreshDashboardData = () => {
           fetch("/api/refresh", {method:"POST"}).then(() => {
             const reFetch = () => fetch("/api/data").then(r => r.json()).then(d => {
@@ -267,6 +271,7 @@ function BayviewDashboard() {
     { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
           { id: "intake", label: "Lead Intake" },
+    { id: "sessions", label: "Sessions" },
   ];
   const filterBtns = [
     { id: "ytd", label: "Year-to-Date" },
@@ -396,7 +401,25 @@ function BayviewDashboard() {
     today: "Today · February 6, 2026",
   };
 
-  return (
+  
+  // Sessions data fetching
+  useEffect(() => {
+    if (activeTab !== "sessions") return;
+    setSessionsLoading(true);
+    fetch("/api/sessions?weeks=12")
+      .then(r => r.json())
+      .then(data => {
+        setSessionsData(data);
+        if (data.weeks && data.weeks.length > 0) {
+          const currentIdx = data.weeks.findIndex(w => w.is_current);
+          setSessionsWeekIdx(currentIdx >= 0 ? currentIdx : data.weeks.length - 1);
+        }
+        setSessionsLoading(false);
+      })
+      .catch(e => { console.error("Sessions fetch error:", e); setSessionsLoading(false); });
+  }, [activeTab]);
+
+return (
     <div style={{ fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif", background: C.bg, color: C.text, minHeight: "100vh", fontSize: 13 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -922,6 +945,144 @@ function BayviewDashboard() {
                 </ChartCard>
               </div>
             )}
+
+
+
+
+        {/* ═══ SESSIONS TAB ═══ */}
+        {activeTab === "sessions" && (
+          <div className="animate-in">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>Weekly Session Counts by Therapist</h2>
+              <button onClick={() => {
+                setSessionsLoading(true);
+                fetch("/api/sessions?weeks=12")
+                  .then(r => r.json())
+                  .then(data => { setSessionsData(data); setSessionsLoading(false); })
+                  .catch(() => setSessionsLoading(false));
+              }} style={{ padding: "8px 20px", background: C.accent, color: "#0B0E11", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14 }}>
+                Refresh
+              </button>
+            </div>
+
+            {sessionsLoading && <div style={{ textAlign: "center", padding: 40, color: C.muted }}>Loading session data from calendars...</div>}
+
+            {!sessionsLoading && sessionsData && sessionsData.weeks && (
+              <div>
+                {/* Week selector */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                  {sessionsData.weeks.map((w, idx) => (
+                    <button key={idx} onClick={() => setSessionsWeekIdx(idx)}
+                      style={{
+                        padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+                        background: sessionsWeekIdx === idx ? C.accent : C.card,
+                        color: sessionsWeekIdx === idx ? "#0B0E11" : C.text,
+                        fontWeight: sessionsWeekIdx === idx ? 700 : 400,
+                        fontSize: 13, transition: "all 0.2s",
+                        outline: w.is_current ? ("2px solid " + C.accent) : "none",
+                        outlineOffset: 2,
+                      }}>
+                      {w.week_label}{w.is_current ? " (Current)" : ""}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Selected week data */}
+                {sessionsWeekIdx !== null && sessionsData.weeks[sessionsWeekIdx] && (() => {
+                  const week = sessionsData.weeks[sessionsWeekIdx];
+                  const locations = Object.keys(week.locations);
+                  return (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 600, color: C.text }}>Week of {week.week_label}</h3>
+                        <div style={{ background: C.accent, color: "#0B0E11", padding: "6px 16px", borderRadius: 20, fontWeight: 700, fontSize: 15 }}>
+                          Total: {week.grand_total} sessions
+                        </div>
+                      </div>
+                      {locations.length === 0 && <div style={{ textAlign: "center", padding: 40, color: C.muted }}>No sessions found for this week.</div>}
+                      {locations.map(loc => {
+                        const locData = week.locations[loc];
+                        const eKey = loc + "_" + sessionsWeekIdx;
+                        const isExpanded = sessionsExpanded[eKey] !== false;
+                        return (
+                          <ChartCard key={loc} title={loc + " (" + locData.location_total + " sessions)"}>
+                            <div style={{ cursor: "pointer", marginBottom: 8 }} onClick={() => setSessionsExpanded(prev => ({...prev, [eKey]: !isExpanded}))}>
+                              <span style={{ color: C.muted, fontSize: 13 }}>{isExpanded ? "\u25BC" : "\u25B6"} {isExpanded ? "Hide" : "Show"} details</span>
+                            </div>
+                            {isExpanded && (
+                              <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: "1px solid " + C.border }}>
+                                      <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Therapist</th>
+                                      {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => <th key={d} style={{ textAlign: "center", padding: "10px 8px", color: C.muted, fontWeight: 600, minWidth: 45 }}>{d}</th>)}
+                                      <th style={{ textAlign: "center", padding: "10px 12px", color: C.accent, fontWeight: 700, minWidth: 55 }}>Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {locData.rows.map((row, ri) => (
+                                      <tr key={ri} style={{ borderBottom: "1px solid " + C.border + "40" }}>
+                                        <td style={{ padding: "10px 12px", fontWeight: 600, color: C.text }}>{row.therapist}</td>
+                                        {["mon","tue","wed","thu","fri","sat","sun"].map(day => (
+                                          <td key={day} style={{ textAlign: "center", padding: "10px 8px", color: row[day] > 0 ? C.text : C.muted + "60" }}>{row[day] > 0 ? row[day] : "-"}</td>
+                                        ))}
+                                        <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent }}>{row.total}</td>
+                                      </tr>
+                                    ))}
+                                    <tr style={{ borderTop: "2px solid " + C.border }}>
+                                      <td style={{ padding: "10px 12px", fontWeight: 700, color: C.text }}>Location Total</td>
+                                      {["mon","tue","wed","thu","fri","sat","sun"].map(day => {
+                                        const dt = locData.rows.reduce((s, r) => s + r[day], 0);
+                                        return <td key={day} style={{ textAlign: "center", padding: "10px 8px", fontWeight: 600, color: dt > 0 ? C.text : C.muted }}>{dt > 0 ? dt : "-"}</td>;
+                                      })}
+                                      <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent, fontSize: 16 }}>{locData.location_total}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </ChartCard>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Therapist summary across all weeks */}
+                {sessionsData.therapist_summary && sessionsData.therapist_summary.length > 0 && (
+                  <ChartCard title={"All Weeks Summary (" + sessionsData.weeks_back + " weeks)"}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid " + C.border }}>
+                            <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Therapist</th>
+                            {sessionsData.locations.map(loc => <th key={loc} style={{ textAlign: "center", padding: "10px 8px", color: C.muted, fontWeight: 600 }}>{loc}</th>)}
+                            <th style={{ textAlign: "center", padding: "10px 12px", color: C.accent, fontWeight: 700 }}>Total</th>
+                            <th style={{ textAlign: "center", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Avg/Wk</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sessionsData.therapist_summary.sort((a, b) => b.total_sessions - a.total_sessions).map((t, i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid " + C.border + "40" }}>
+                              <td style={{ padding: "10px 12px", fontWeight: 600, color: C.text }}>{t.therapist}</td>
+                              {sessionsData.locations.map(loc => <td key={loc} style={{ textAlign: "center", padding: "10px 8px", color: t.by_location[loc] ? C.text : C.muted + "60" }}>{t.by_location[loc] || "-"}</td>)}
+                              <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent }}>{t.total_sessions}</td>
+                              <td style={{ textAlign: "center", padding: "10px 12px", color: C.text }}>{(t.total_sessions / sessionsData.weeks_back).toFixed(1)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </ChartCard>
+                )}
+              </div>
+            )}
+
+            {!sessionsLoading && !sessionsData && (
+              <div style={{ textAlign: "center", padding: 40, color: C.muted }}>No session data available. Click Refresh to load.</div>
+            )}
+          </div>
+        )}
 
 
         {/* ═══ ROOM RENTAL TAB ═══ */}
