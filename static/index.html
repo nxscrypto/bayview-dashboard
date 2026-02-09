@@ -297,13 +297,6 @@ function BayviewDashboard() {
         fetchRentalSessions().then(function(summary) { populateWithData(summary); });
       }
     };
-      // Use ref for synchronous cache check
-      if (rentalSessionsRef.current) {
-        doPopulate(rentalSessionsRef.current);
-      } else {
-        fetchRentalSessions().then(function(summary) { doPopulate(summary); });
-      }
-    };
 
 
     // Preload session data when component mounts
