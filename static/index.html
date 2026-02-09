@@ -167,7 +167,14 @@ function BayviewDashboard() {
   const [sessionsExpanded, setSessionsExpanded] = useState({});
 
     // Rental Input state
-    const [rentalForm, setRentalForm] = useState({ week_start: '', week_end: '', entries: [{ therapist: '', location: 'FTL', amount: '', category: 'room_rental', notes: '' }] });
+    const [rentalForm, setRentalForm] = useState(() => {
+          const autoWeek = getAutoWeekDates();
+          return {
+            week_start: autoWeek.week_start,
+            week_end: autoWeek.week_end,
+            entries: [{ therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '' }]
+          };
+        });
     const [rentalMsg, setRentalMsg] = useState(null);
     const [rentalWeekEntries, setRentalWeekEntries] = useState([]);
     const [rentalLoadingEntries, setRentalLoadingEntries] = useState(false);
@@ -176,7 +183,40 @@ function BayviewDashboard() {
     const RENTAL_LOCATIONS = ["FTL", "CS", "PL", "Testing", "MKT"];
     const RENTAL_CATEGORIES = ["room_rental", "marketing", "testing"];
 
-    const addRentalRow = () => setRentalForm(f => ({...f, entries: [...f.entries, { therapist: '', location: 'FTL', amount: '', category: 'room_rental', notes: '' }]}));
+        // Auto-calculate Monday-Sunday week dates
+        const getAutoWeekDates = () => {
+          const today = new Date();
+          const day = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+          let weekMonday = new Date(today);
+          if (day >= 2) {
+            // Tuesday through Saturday: show current week's Mon-Sun
+            weekMonday.setDate(today.getDate() - (day - 1));
+          } else if (day === 1) {
+            // Monday: show PRIOR week's Mon-Sun (for assistant to enter)
+            weekMonday.setDate(today.getDate() - 7);
+          } else {
+            // Sunday (day=0): show prior week's Mon-Sun
+            weekMonday.setDate(today.getDate() - 6);
+          }
+          const weekSunday = new Date(weekMonday);
+          weekSunday.setDate(weekMonday.getDate() + 6);
+          const fmt = (d) => d.toISOString().split('T')[0];
+          return { week_start: fmt(weekMonday), week_end: fmt(weekSunday) };
+        };
+
+        // Combined list of therapist names for rental input dropdown
+        const RENTAL_THERAPISTS = [
+          "Adelle F.", "Alex S.", "Alexa V.", "Alyssa W.", "Carla B.", "Claire C.",
+          "David S.", "Dr Jeffrey", "Heather D.", "Jackie S.", "Jamie R.",
+          "Jnay R.", "Jonathan Stiglich", "Jorge H.", "Kacee T.", "Maria C",
+          "Nicole A.", "Nicole G.", "Sara S.", "Seychelle S.", "Tahnnee M.",
+          "Tatiana St.", "Taylor P.", "Valeria S.",
+          "Dr. Heather V", "Dr. Heather K", "Simone F", "Kimberly G",
+          "Dr. Brittany", "BTI Nova", "Jessica C", "Crystal A",
+          "Dr Michael Collins", "Lorena A", "Dr. Halle S"
+        ].sort();
+
+    const addRentalRow = () => setRentalForm(f => ({...f, entries: [...f.entries, { therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '' }]}));
     const removeRentalRow = (idx) => setRentalForm(f => ({...f, entries: f.entries.filter((_, i) => i !== idx)}));
     const updateRentalRow = (idx, field, value) => setRentalForm(f => ({...f, entries: f.entries.map((ent, i) => i === idx ? {...ent, [field]: value} : ent)}));
 
@@ -189,7 +229,16 @@ function BayviewDashboard() {
 
     const submitRental = () => {
       if (!rentalForm.week_start || !rentalForm.week_end) { setRentalMsg({type:"error",text:"Week start and end dates required"}); return; }
-      const validEntries = rentalForm.entries.filter(ent => ent.therapist && parseFloat(ent.amount) > 0);
+      const validEntries = [];
+            rentalForm.entries.forEach(ent => {
+              if (!ent.therapist) return;
+              const roomAmt = parseFloat(ent.amount_room) || 0;
+              const mktAmt = parseFloat(ent.amount_mkt) || 0;
+              const testAmt = parseFloat(ent.amount_test) || 0;
+              if (roomAmt > 0) validEntries.push({ therapist: ent.therapist, location: ent.location, amount: String(roomAmt), category: 'room_rental', notes: ent.notes });
+              if (mktAmt > 0) validEntries.push({ therapist: ent.therapist, location: ent.location === 'MKT' ? 'MKT' : ent.location, amount: String(mktAmt), category: 'marketing', notes: ent.notes });
+              if (testAmt > 0) validEntries.push({ therapist: ent.therapist, location: ent.location === 'Testing' ? 'Testing' : ent.location, amount: String(testAmt), category: 'testing', notes: ent.notes });
+            });
       if (!validEntries.length) { setRentalMsg({type:"error",text:"Add at least one therapist with an amount"}); return; }
       if (editingRentalWeek) {
         fetch("/api/rental/week/delete", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({week_start: rentalForm.week_start, week_end: rentalForm.week_end})})
@@ -213,7 +262,17 @@ function BayviewDashboard() {
       fetch("/api/rental/week?week_start=" + ws + "&week_end=" + we)
         .then(r => r.json()).then(data => {
           if (Array.isArray(data) && data.length > 0) {
-            setRentalForm({week_start: ws, week_end: we, entries: data.map(ent => ({therapist: ent.therapist, location: ent.location, amount: String(ent.amount), category: ent.category, notes: ent.notes || ''}))}); setRentalMsg({type:"success",text:"Editing week " + ws + " \u2014 " + we + ". Make changes and click Update."});
+            // Group entries by therapist+location for multi-amount display
+                const grouped = {};
+                data.forEach(ent => {
+                  const key = ent.therapist + '|' + ent.location;
+                  if (!grouped[key]) grouped[key] = { therapist: ent.therapist, location: ent.location, amount_room: '', amount_mkt: '', amount_test: '', notes: ent.notes || '' };
+                  if (ent.category === 'room_rental') grouped[key].amount_room = String(ent.amount);
+                  else if (ent.category === 'marketing') grouped[key].amount_mkt = String(ent.amount);
+                  else if (ent.category === 'testing') grouped[key].amount_test = String(ent.amount);
+                  if (ent.notes) grouped[key].notes = ent.notes;
+                });
+                setRentalForm({week_start: ws, week_end: we, entries: Object.values(grouped)}); setRentalMsg({type:"success",text:"Editing week " + ws + " \u2014 " + we + ". Make changes and click Update."});
           }
         });
     };
@@ -323,6 +382,7 @@ function BayviewDashboard() {
     { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
           { id: "intake", label: "Lead Intake" },
+          { id: "rentalInput", label: "\ud83d\udcdd Room Rental Input" },
     { id: "sessions", label: "Sessions" },
   ];
   const filterBtns = [
@@ -953,7 +1013,7 @@ return (
                           <td style={{padding:"8px 6px"}}><select value={lead.referred_to} onChange={e => updatePendingLead(lead.id, "referred_to", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: C.text, fontSize:11, maxWidth:130}}><option value="Pending">Pending</option>{THERAPISTS.filter(t => t !== "Pending").map(t => <option key={t} value={t}>{t}</option>)}</select></td>
                           <td style={{padding:"8px 6px"}}><select value={lead.referral_outcome} onChange={e => updatePendingLead(lead.id, "referral_outcome", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" ? C.rose : C.text, fontSize:11}}>{OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}</select></td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.notes}</td>
-                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={() => deleteLead(lead.id, lead.first_name + " " + lead.last_name)} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">×</button></td>
+                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={() => deleteLead(lead.id, lead.first_name + " " + lead.last_name)} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">✕</button></td>
                         </tr>;
                       })}</tbody>
                     </table>
@@ -989,7 +1049,7 @@ return (
                           <td style={{padding:"8px 6px", color: C.text, fontWeight:600}}>{lead.referred_to}</td>
                           <td style={{padding:"8px 6px", color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" || lead.referral_outcome === "Cancelled" ? C.rose : C.textMuted}}>{lead.referral_outcome}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11}}>{lead.referral_source}</td>
-                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={(e) => { e.stopPropagation(); deleteLead(lead.id, lead.first_name + " " + lead.last_name); }} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">×</button></td>
+                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={(e) => { e.stopPropagation(); deleteLead(lead.id, lead.first_name + " " + lead.last_name); }} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">✕</button></td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -1002,7 +1062,70 @@ return (
 
 
         {/* ═══ SESSIONS TAB ═══ */}
-        {activeTab === "sessions" && (
+        
+          {/* ═══ ROOM RENTAL INPUT TAB ═══ */}
+          {activeTab === "rentalInput" && (
+            <div>
+              <ChartCard title="\ud83d\udcdd Weekly Room Rental Input" subtitle="Enter weekly rental amounts per therapist \u2014 supports room rental, marketing & testing amounts per entry">
+                {rentalMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: rentalMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: rentalMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{rentalMsg.text}</div>}
+                <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16}}>
+                  <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week Start (Monday) *</label><input type="date" value={rentalForm.week_start} onChange={e => setRentalForm({...rentalForm, week_start: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                  <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week End (Sunday) *</label><input type="date" value={rentalForm.week_end} onChange={e => setRentalForm({...rentalForm, week_end: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                </div>
+                <div style={{fontSize:11, color:C.textMuted, marginBottom:12, padding:"6px 10px", background:"#1a1a2e", borderRadius:6, border:"1px solid #2a2a4a"}}>
+                  \ud83d\udcc5 Dates auto-populated: Monday\u2013Sunday. Updates each Tuesday to current week. Your assistant enters on Monday for the prior week.
+                </div>
+                <div style={{fontSize:12, fontWeight:700, color:C.textMuted, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5}}>Therapist Entries</div>
+                {rentalForm.entries.map((entry, idx) => (
+                  <div key={idx} style={{display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr auto", gap:8, marginBottom:8, alignItems:"end"}}>
+                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Therapist</label><select value={entry.therapist} onChange={e => updateRentalRow(idx, 'therapist', e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select therapist...</option>{RENTAL_THERAPISTS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Location</label><select value={entry.location} onChange={e => updateRentalRow(idx, 'location', e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}>{RENTAL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Room Rental ($)</label><input type="number" step="0.01" value={entry.amount_room} onChange={e => updateRentalRow(idx, 'amount_room', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Marketing ($)</label><input type="number" step="0.01" value={entry.amount_mkt} onChange={e => updateRentalRow(idx, 'amount_mkt', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Testing ($)</label><input type="number" step="0.01" value={entry.amount_test} onChange={e => updateRentalRow(idx, 'amount_test', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
+                    <button onClick={() => removeRentalRow(idx)} style={{background:"transparent", border:"1px solid #E85D7540", color:C.rose, cursor:"pointer", fontSize:16, padding:"6px 10px", borderRadius:6, marginBottom:2, lineHeight:1, display:"flex", alignItems:"center", justifyContent:"center"}} title="Remove row">\u2715</button>
+                  </div>
+                ))}
+                <div style={{display:"flex", gap:12, marginTop:12}}>
+                  <button onClick={addRentalRow} style={{padding:"8px 20px", background:"transparent", border:"1px solid " + C.accent + "40", borderRadius:8, color:C.accent, fontWeight:600, cursor:"pointer", fontSize:13}}>+ Add Row</button>
+                  <button onClick={submitRental} style={{padding:"8px 24px", background: editingRentalWeek ? "#F59E0B" : C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:700, fontSize:14, cursor:"pointer"}}>{editingRentalWeek ? "Update Week" : "Submit Week"}</button>
+                  {editingRentalWeek && <button onClick={() => { setEditingRentalWeek(null); const autoWeek = getAutoWeekDates(); setRentalForm({week_start: autoWeek.week_start, week_end: autoWeek.week_end, entries:[{therapist:'', location:'FTL', amount_room:'', amount_mkt:'', amount_test:'', notes:''}]}); setRentalMsg(null); }} style={{padding:"8px 20px", background:"transparent", color:C.textMuted, border:"1px solid #2a2a4a", borderRadius:8, fontWeight:600, cursor:"pointer", fontSize:13}}>Cancel Edit</button>}
+                </div>
+              </ChartCard>
+
+              {rentalForm.week_start && rentalForm.week_end && (
+                <ChartCard title={"Entries for " + rentalForm.week_start + " \u2014 " + rentalForm.week_end} style={{marginTop:16}}>
+                  <button onClick={() => loadRentalWeek(rentalForm.week_start, rentalForm.week_end)} style={{padding:"6px 16px", background:C.accent, color:"#0B0E11", border:"none", borderRadius:6, fontWeight:600, cursor:"pointer", fontSize:12, marginBottom:12}}>Load Entries</button>
+                  {rentalLoadingEntries ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>Loading...</div>
+                  : rentalWeekEntries.length === 0 ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>No entries for this week yet</div>
+                  : <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
+                        <thead><tr style={{borderBottom:"1px solid #2a2a4a"}}>
+                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Therapist</th>
+                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Location</th>
+                          <th style={{padding:"8px 6px", textAlign:"right", color:C.textMuted, fontWeight:600}}>Amount</th>
+                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Category</th>
+                        </tr></thead>
+                        <tbody>{rentalWeekEntries.map(ent => (
+                          <tr key={ent.id} style={{borderBottom:"1px solid #1a1a2e"}}>
+                            <td style={{padding:"8px 6px", color:C.text, fontWeight:600}}>{ent.therapist}</td>
+                            <td style={{padding:"8px 6px", color:C.textMuted}}>{ent.location}</td>
+                            <td style={{padding:"8px 6px", textAlign:"right", color:C.accent, fontWeight:700}}>{"$" + parseFloat(ent.amount).toLocaleString()}</td>
+                            <td style={{padding:"8px 6px", color:C.textMuted}}>{ent.category}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                      <div style={{marginTop:12}}>
+                        <button onClick={() => loadWeekForEdit(rentalForm.week_start, rentalForm.week_end)} style={{padding:"6px 16px", background:"#F59E0B", color:"#0B0E11", border:"none", borderRadius:6, fontWeight:600, cursor:"pointer", fontSize:12}}>Edit This Week</button>
+                      </div>
+                    </div>
+                  }
+                </ChartCard>
+              )}
+            </div>
+          )}
+
+          {activeTab === "sessions" && (
           <div className="animate-in">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>Weekly Session Counts by Therapist</h2>
@@ -1296,59 +1419,8 @@ return (
               </div>
             </ChartCard>
           
-              {/* Room Rental Weekly Input */}
-              <ChartCard title={"\ud83d\udcdd Weekly Room Rental Input"} subtitle="Enter weekly rental amounts per therapist" style={{ marginTop: 24 }}>
-                {rentalMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: rentalMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: rentalMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{rentalMsg.text}</div>}
-                <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16}}>
-                  <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week Start *</label><input type="date" value={rentalForm.week_start} onChange={e => setRentalForm({...rentalForm, week_start: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
-                  <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week End *</label><input type="date" value={rentalForm.week_end} onChange={e => setRentalForm({...rentalForm, week_end: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
-                </div>
-                <div style={{fontSize:12, fontWeight:700, color:C.textMuted, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5}}>Therapist Entries</div>
-                {rentalForm.entries.map((entry, idx) => (
-                  <div key={idx} style={{display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr auto", gap:8, marginBottom:8, alignItems:"end"}}>
-                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Therapist</label><input value={entry.therapist} onChange={e => updateRentalRow(idx, 'therapist', e.target.value)} placeholder="e.g. Heather D" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
-                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Location</label><select value={entry.location} onChange={e => updateRentalRow(idx, 'location', e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}>{RENTAL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
-                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Amount ($)</label><input type="number" step="0.01" value={entry.amount} onChange={e => updateRentalRow(idx, 'amount', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
-                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Category</label><select value={entry.category} onChange={e => updateRentalRow(idx, 'category', e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}>{RENTAL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></div>
-                    <button onClick={() => removeRentalRow(idx)} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:18, padding:"4px 8px", marginBottom:2}} title="Remove">\u00d7</button>
-                  </div>
-                ))}
-                <div style={{display:"flex", gap:12, marginTop:12}}>
-                  <button onClick={addRentalRow} style={{padding:"8px 20px", background:"transparent", border:"1px solid " + C.accent + "40", borderRadius:8, color:C.accent, fontWeight:600, cursor:"pointer", fontSize:13}}>+ Add Row</button>
-                  <button onClick={submitRental} style={{padding:"8px 24px", background: editingRentalWeek ? "#F59E0B" : C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:700, fontSize:14, cursor:"pointer"}}>{editingRentalWeek ? "Update Week" : "Submit Week"}</button>
-                  {editingRentalWeek && <button onClick={() => { setEditingRentalWeek(null); setRentalForm({week_start:'', week_end:'', entries:[{therapist:'', location:'FTL', amount:'', category:'room_rental', notes:''}]}); setRentalMsg(null); }} style={{padding:"8px 20px", background:"transparent", color:C.textMuted, border:"1px solid #2a2a4a", borderRadius:8, fontWeight:600, cursor:"pointer", fontSize:13}}>Cancel Edit</button>}
-                </div>
-              </ChartCard>
-              {rentalForm.week_start && rentalForm.week_end && (
-                <ChartCard title={"Entries for " + rentalForm.week_start + " \u2014 " + rentalForm.week_end} style={{marginTop:16}}>
-                  <button onClick={() => loadRentalWeek(rentalForm.week_start, rentalForm.week_end)} style={{padding:"6px 16px", background:C.accent, color:"#0B0E11", border:"none", borderRadius:6, fontWeight:600, cursor:"pointer", fontSize:12, marginBottom:12}}>Load Entries</button>
-                  {rentalLoadingEntries ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>Loading...</div> :
-                    rentalWeekEntries.length === 0 ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>No entries for this week yet</div> :
-                    <div style={{overflowX:"auto"}}>
-                      <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
-                        <thead><tr style={{borderBottom:"1px solid #2a2a4a"}}>
-                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Therapist</th>
-                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Location</th>
-                          <th style={{padding:"8px 6px", textAlign:"right", color:C.textMuted, fontWeight:600}}>Amount</th>
-                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Category</th>
-                        </tr></thead>
-                        <tbody>{rentalWeekEntries.map(ent => (
-                          <tr key={ent.id} style={{borderBottom:"1px solid #1a1a2e"}}>
-                            <td style={{padding:"8px 6px", color:C.text, fontWeight:600}}>{ent.therapist}</td>
-                            <td style={{padding:"8px 6px", color:C.textMuted}}>{ent.location}</td>
-                            <td style={{padding:"8px 6px", textAlign:"right", color:C.accent, fontWeight:700}}>{"$" + parseFloat(ent.amount).toLocaleString()}</td>
-                            <td style={{padding:"8px 6px", color:C.textMuted}}>{ent.category}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                      <div style={{marginTop:12}}>
-                        <button onClick={() => loadWeekForEdit(rentalForm.week_start, rentalForm.week_end)} style={{padding:"6px 16px", background:"#F59E0B", color:"#0B0E11", border:"none", borderRadius:6, fontWeight:600, cursor:"pointer", fontSize:12}}>Edit This Week</button>
-                      </div>
-                    </div>
-                  }
-                </ChartCard>
-              )}
-</>
+              
+              </>
           );
         })()}
 
