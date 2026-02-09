@@ -999,6 +999,48 @@ return (
                           Total: {week.grand_total} sessions
                         </div>
                       </div>
+                    {/* Week Selected Summary — therapist totals across all locations for selected week */}
+                    {(() => {
+                      const therapistMap = {};
+                      Object.keys(week.locations).forEach(loc => {
+                        const locData = week.locations[loc];
+                        locData.rows.forEach(row => {
+                          if (!therapistMap[row.therapist]) {
+                            therapistMap[row.therapist] = { therapist: row.therapist, total: 0, by_location: {} };
+                          }
+                          therapistMap[row.therapist].total += row.total;
+                          therapistMap[row.therapist].by_location[loc] = (therapistMap[row.therapist].by_location[loc] || 0) + row.total;
+                        });
+                      });
+                      const weekSummary = Object.values(therapistMap).sort((a, b) => b.total - a.total);
+                      const weekLocations = Object.keys(week.locations);
+                      if (weekSummary.length === 0) return null;
+                      return (
+                        <ChartCard title={"Week Summary \u2014 " + week.week_label} style={{ marginBottom: 16 }}>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid " + C.border }}>
+                                  <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Therapist</th>
+                                  {weekLocations.map(loc => <th key={loc} style={{ textAlign: "center", padding: "10px 8px", color: C.muted, fontWeight: 600 }}>{loc}</th>)}
+                                  <th style={{ textAlign: "center", padding: "10px 12px", color: C.accent, fontWeight: 700 }}>Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {weekSummary.map((t, i) => (
+                                  <tr key={i} style={{ borderBottom: "1px solid " + C.border + "40" }}>
+                                    <td style={{ padding: "10px 12px", fontWeight: 600, color: C.text }}>{t.therapist}</td>
+                                    {weekLocations.map(loc => <td key={loc} style={{ textAlign: "center", padding: "10px 8px", color: t.by_location[loc] ? C.text : C.muted + "60" }}>{t.by_location[loc] || "\u2013"}</td>)}
+                                    <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent }}>{t.total}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </ChartCard>
+                      );
+                    })()}
+
                       {locations.length === 0 && <div style={{ textAlign: "center", padding: 40, color: C.muted }}>No sessions found for this week.</div>}
                       {locations.map(loc => {
                         const locData = week.locations[loc];
@@ -1048,33 +1090,6 @@ return (
                   );
                 })()}
 
-                {/* Therapist summary across all weeks */}
-                {sessionsData.therapist_summary && sessionsData.therapist_summary.length > 0 && (
-                  <ChartCard title={"All Weeks Summary (" + sessionsData.weeks_back + " weeks)"}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                        <thead>
-                          <tr style={{ borderBottom: "1px solid " + C.border }}>
-                            <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Therapist</th>
-                            {sessionsData.locations.map(loc => <th key={loc} style={{ textAlign: "center", padding: "10px 8px", color: C.muted, fontWeight: 600 }}>{loc}</th>)}
-                            <th style={{ textAlign: "center", padding: "10px 12px", color: C.accent, fontWeight: 700 }}>Total</th>
-                            <th style={{ textAlign: "center", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Avg/Wk</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sessionsData.therapist_summary.sort((a, b) => b.total_sessions - a.total_sessions).map((t, i) => (
-                            <tr key={i} style={{ borderBottom: "1px solid " + C.border + "40" }}>
-                              <td style={{ padding: "10px 12px", fontWeight: 600, color: C.text }}>{t.therapist}</td>
-                              {sessionsData.locations.map(loc => <td key={loc} style={{ textAlign: "center", padding: "10px 8px", color: t.by_location[loc] ? C.text : C.muted + "60" }}>{t.by_location[loc] || "-"}</td>)}
-                              <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent }}>{t.total_sessions}</td>
-                              <td style={{ textAlign: "center", padding: "10px 12px", color: C.text }}>{(t.total_sessions / sessionsData.weeks_back).toFixed(1)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </ChartCard>
-                )}
               </div>
             )}
 
