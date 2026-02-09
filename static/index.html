@@ -291,12 +291,6 @@ function BayviewDashboard() {
         fetchRentalSessions().then(function(summary) { doPopulate(summary); });
       }
     };
-      if (rentalSessionsCache) {
-        doPopulate(rentalSessionsCache);
-      } else {
-        fetchRentalSessions().then(summary => doPopulate(summary));
-      }
-    };
 
 
     // Preload session data when component mounts
