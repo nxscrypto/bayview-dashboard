@@ -19,8 +19,10 @@ app = Flask(__name__, static_folder="static")
 
 # ── Database ─────────────────────────────────────────────────────────────────
 from database import init_db, add_lead, update_lead, get_pending_leads, get_recent_leads, get_lead, delete_lead
+from database import init_rental_db, add_rental_entry, add_rental_entries_bulk, update_rental_entry, delete_rental_entry, get_rental_entry, get_rental_entries_by_week, get_recent_rental_entries, get_rental_weeks, delete_rental_week
 from calendar_sync import get_sessions_data
 init_db()
+init_rental_db()
 
 # ── State ────────────────────────────────────────────────────────────────────
 _lock = threading.Lock()
@@ -213,6 +215,106 @@ def api_delete_lead(lead_id):
     return jsonify({"ok": True, "deleted": lead_id})
 
 
+
+
+# ── Rental API ───────────────────────────────────────────────────────────────────────
+
+@app.route("/api/rental", methods=["POST"])
+def api_add_rental():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    # Support bulk insert (list of entries) or single entry
+    entries = data.get("entries")
+    if entries and isinstance(entries, list):
+        # Bulk insert for a whole week
+        required = ["week_start", "week_end"]
+        for field in required:
+            if not data.get(field):
+                return jsonify({"error": f"Missing: {field}"}), 400
+
+        week_start = data["week_start"]
+        week_end = data["week_end"]
+        bulk = []
+        for e in entries:
+            if not e.get("therapist") or not e.get("amount"):
+                continue
+            bulk.append({
+                "week_start": week_start,
+                "week_end": week_end,
+                "therapist": e["therapist"],
+                "location": e.get("location", ""),
+                "amount": e["amount"],
+                "category": e.get("category", "room_rental"),
+                "notes": e.get("notes", ""),
+            })
+        if not bulk:
+            return jsonify({"error": "No valid entries"}), 400
+        ids = add_rental_entries_bulk(bulk)
+        return jsonify({"ok": True, "ids": ids, "count": len(ids)}), 201
+    else:
+        # Single entry
+        required = ["week_start", "week_end", "therapist", "amount"]
+        missing = [f for f in required if not data.get(f)]
+        if missing:
+            return jsonify({"error": f"Missing: {', '.join(missing)}"}), 400
+        entry_id = add_rental_entry(data)
+        return jsonify({"ok": True, "id": entry_id}), 201
+
+
+@app.route("/api/rental/week")
+def api_rental_by_week():
+    week_start = request.args.get("week_start")
+    week_end = request.args.get("week_end")
+    if not week_start:
+        return jsonify({"error": "week_start required"}), 400
+    entries = get_rental_entries_by_week(week_start, week_end)
+    return jsonify(entries)
+
+
+@app.route("/api/rental/recent")
+def api_recent_rental():
+    weeks = request.args.get("weeks", 12, type=int)
+    entries = get_recent_rental_entries(weeks)
+    return jsonify(entries)
+
+
+@app.route("/api/rental/weeks")
+def api_rental_weeks():
+    weeks = get_rental_weeks()
+    return jsonify(weeks)
+
+
+@app.route("/api/rental/<int:entry_id>", methods=["PUT"])
+def api_update_rental(entry_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    entry = get_rental_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+    update_rental_entry(entry_id, data)
+    updated = get_rental_entry(entry_id)
+    return jsonify({"ok": True, "entry": updated})
+
+
+@app.route("/api/rental/<int:entry_id>", methods=["DELETE"])
+def api_delete_rental(entry_id):
+    entry = get_rental_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+    delete_rental_entry(entry_id)
+    return jsonify({"ok": True, "deleted": entry_id})
+
+
+@app.route("/api/rental/week/delete", methods=["POST"])
+def api_delete_rental_week():
+    data = request.get_json()
+    if not data or not data.get("week_start") or not data.get("week_end"):
+        return jsonify({"error": "week_start and week_end required"}), 400
+    delete_rental_week(data["week_start"], data["week_end"])
+    return jsonify({"ok": True})
 
 # ── Sessions API ─────────────────────────────────────────────────────────────
 @app.route("/api/sessions")
