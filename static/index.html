@@ -207,7 +207,7 @@ function BayviewDashboard() {
           return {
             week_start: autoWeek.week_start,
             week_end: autoWeek.week_end,
-            entries: [{ therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '' }]
+            entries: [{ therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '', sessions: '' }]
           };
         });
     const [rentalMsg, setRentalMsg] = useState(null);
@@ -215,10 +215,84 @@ function BayviewDashboard() {
     const [rentalLoadingEntries, setRentalLoadingEntries] = useState(false);
     const [editingRentalWeek, setEditingRentalWeek] = useState(null);
 
+    // Session data cache for rental auto-population
+    const [rentalSessionsCache, setRentalSessionsCache] = React.useState(null);
+    const [rentalSessionsLoading, setRentalSessionsLoading] = React.useState(false);
+
+    // Map full location names to rental codes
+    const LOCATION_REVERSE = {'Coral Springs':'CS','Fort Lauderdale':'FTL','Plantation':'PL','Telehealth':'FTL'};
+
+    // Match rental dropdown name to session therapist name
+    const matchTherapistToSession = (rentalName, sessionSummary) => {
+      if (!rentalName || !sessionSummary) return null;
+      const rn = rentalName.toLowerCase().replace(/[^a-z]/g, '');
+      let best = null, bestScore = 0;
+      for (const t of sessionSummary) {
+        const sn = t.therapist.toLowerCase().replace(/[^a-z]/g, '');
+        const snBase = sn.replace(/\*+$/, '');
+        let score = 0;
+        if (rn === snBase) score = 100;
+        else if (rn.startsWith(snBase) || snBase.startsWith(rn)) score = 80;
+        else { const rnFirst = rn.split(/[^a-z]/)[0]; const snFirst = snBase.split(/[^a-z]/)[0]; if (rnFirst.length >= 3 && snFirst.length >= 3 && (rnFirst.startsWith(snFirst) || snFirst.startsWith(rnFirst))) score = 60; }
+        if (score > bestScore) { bestScore = score; best = t; }
+      }
+      return best;
+    };
+
+    // Fetch session data for rental auto-population
+    const fetchRentalSessions = () => {
+      if (rentalSessionsCache) return Promise.resolve(rentalSessionsCache);
+      setRentalSessionsLoading(true);
+      return fetch('/api/sessions?weeks=1')
+        .then(r => r.json())
+        .then(data => {
+          const summary = data.therapist_summary || [];
+          setRentalSessionsCache(summary);
+          setRentalSessionsLoading(false);
+          return summary;
+        })
+        .catch(err => {
+          console.error('Failed to fetch sessions:', err);
+          setRentalSessionsLoading(false);
+          return [];
+        });
+    };
+
+    // Handle therapist selection - auto-populate location rows with session counts
+    const handleTherapistSelect = (idx, value) => {
+      updateRentalRow(idx, "therapist", value);
+      if (!value) return;
+      const doPopulate = (summary) => {
+        const match = matchTherapistToSession(value, summary);
+        if (!match || !match.by_location) return;
+        const locs = Object.entries(match.by_location);
+        if (locs.length === 0) return;
+        const merged = {};
+        for (const [loc, count] of locs) {
+          const code = LOCATION_REVERSE[loc] || 'FTL';
+          merged[code] = (merged[code] || 0) + count;
+        }
+        const locEntries = Object.entries(merged);
+        setRentalForm(f => {
+          const newEntries = [...f.entries];
+          newEntries[idx] = {...newEntries[idx], therapist: value, location: locEntries[0][0], sessions: String(locEntries[0][1])};
+          for (let i = 1; i < locEntries.length; i++) {
+            newEntries.splice(idx + i, 0, {therapist: value, location: locEntries[i][0], sessions: String(locEntries[i][1]), amount_room: '', amount_mkt: '', amount_test: '', notes: ''});
+          }
+          return {...f, entries: newEntries};
+        });
+      };
+      if (rentalSessionsCache) {
+        doPopulate(rentalSessionsCache);
+      } else {
+        fetchRentalSessions().then(summary => doPopulate(summary));
+      }
+    };
+
     const RENTAL_LOCATIONS = ["FTL", "CS", "PL", "Testing", "MKT"];
     const RENTAL_CATEGORIES = ["room_rental", "marketing", "testing"];
 
-    const addRentalRow = () => setRentalForm(f => ({...f, entries: [...f.entries, { therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '' }]}));
+    const addRentalRow = () => setRentalForm(f => ({...f, entries: [...f.entries, { therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '', sessions: '' }]}));
     const removeRentalRow = (idx) => setRentalForm(f => ({...f, entries: f.entries.filter((_, i) => i !== idx)}));
     const updateRentalRow = (idx, field, value) => setRentalForm(f => ({...f, entries: f.entries.map((ent, i) => i === idx ? {...ent, [field]: value} : ent)}));
 
@@ -1074,11 +1148,14 @@ return (
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week Start (Monday) *</label><input type="date" value={rentalForm.week_start} onChange={e => setRentalForm({...rentalForm, week_start: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week End (Sunday) *</label><input type="date" value={rentalForm.week_end} onChange={e => setRentalForm({...rentalForm, week_end: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                 </div>
+                <div style={{fontSize:11, color:C.textDim, marginBottom:8, fontStyle:'italic'}}>Select a therapist to auto-populate locations and session counts from calendar data.</div>
+                {rentalSessionsLoading && <div style={{padding:'8px 12px', marginBottom:8, borderRadius:6, background:'#1E3A5F', color:'#60A5FA', fontSize:11}}>Loading session data...</div>}
                 <div style={{fontSize:12, fontWeight:700, color:C.textMuted, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5}}>Therapist Entries</div>
                 {rentalForm.entries.map((entry, idx) => (
-                  <div key={idx} style={{display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr auto", gap:8, marginBottom:8, alignItems:"end"}}>
-                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Therapist</label><select value={entry.therapist} onChange={e => updateRentalRow(idx, 'therapist', e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select therapist...</option>{RENTAL_THERAPISTS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                  <div key={idx} style={{display:"grid", gridTemplateColumns:"2fr 1fr 0.8fr 1fr 1fr 1fr auto", gap:8, marginBottom:8, alignItems:"end"}}>
+                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Therapist</label><select value={entry.therapist} onChange={e => handleTherapistSelect(idx, e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select therapist...</option>{RENTAL_THERAPISTS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Location</label><select value={entry.location} onChange={e => updateRentalRow(idx, 'location', e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}>{RENTAL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+                    <div><label style={{fontSize:10, color:C.textDim, display:'block', marginBottom:2}}>Sessions</label><input type="number" value={entry.sessions} onChange={e => updateRentalRow(idx, 'sessions', e.target.value)} style={{width:'100%', padding:'6px 8px', background:C.card, border:'1px solid ' + C.border, borderRadius:6, color:'#4ADE80', fontSize:13, fontWeight:600}} placeholder="0" /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Room Rental ($)</label><input type="number" step="0.01" value={entry.amount_room} onChange={e => updateRentalRow(idx, 'amount_room', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Marketing ($)</label><input type="number" step="0.01" value={entry.amount_mkt} onChange={e => updateRentalRow(idx, 'amount_mkt', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Testing ($)</label><input type="number" step="0.01" value={entry.amount_test} onChange={e => updateRentalRow(idx, 'amount_test', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
