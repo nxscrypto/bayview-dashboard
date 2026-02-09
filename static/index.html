@@ -384,7 +384,7 @@ function BayviewDashboard() {
     { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
           { id: "intake", label: "Lead Intake" },
-          { id: "rentalInput", label: "📝 Room Rental Input" },
+          { id: "rentalInput", label: "Room Rental Input" },
     { id: "sessions", label: "Sessions" },
   ];
   const filterBtns = [
@@ -1015,7 +1015,7 @@ return (
                           <td style={{padding:"8px 6px"}}><select value={lead.referred_to} onChange={e => updatePendingLead(lead.id, "referred_to", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: C.text, fontSize:11, maxWidth:130}}><option value="Pending">Pending</option>{THERAPISTS.filter(t => t !== "Pending").map(t => <option key={t} value={t}>{t}</option>)}</select></td>
                           <td style={{padding:"8px 6px"}}><select value={lead.referral_outcome} onChange={e => updatePendingLead(lead.id, "referral_outcome", e.target.value)} style={{padding:"4px 6px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:4, color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" ? C.rose : C.text, fontSize:11}}>{OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}</select></td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11, maxWidth:150, overflow:"hidden", textOverflow:"ellipsis"}}>{lead.notes}</td>
-                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={() => deleteLead(lead.id, lead.first_name + " " + lead.last_name)} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">✕</button></td>
+                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={() => deleteLead(lead.id, lead.first_name + " " + lead.last_name)} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">×</button></td>
                         </tr>;
                       })}</tbody>
                     </table>
@@ -1051,7 +1051,7 @@ return (
                           <td style={{padding:"8px 6px", color: C.text, fontWeight:600}}>{lead.referred_to}</td>
                           <td style={{padding:"8px 6px", color: lead.referral_outcome === "Booked" ? C.accent : lead.referral_outcome === "Never Booked" || lead.referral_outcome === "Cancelled" ? C.rose : C.textMuted}}>{lead.referral_outcome}</td>
                           <td style={{padding:"8px 6px", color:C.textMuted, fontSize:11}}>{lead.referral_source}</td>
-                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={(e) => { e.stopPropagation(); deleteLead(lead.id, lead.first_name + " " + lead.last_name); }} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">✕</button></td>
+                          <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={(e) => { e.stopPropagation(); deleteLead(lead.id, lead.first_name + " " + lead.last_name); }} style={{background:"transparent", border:"none", color:C.rose, cursor:"pointer", fontSize:"16px", padding:"2px 6px"}} title="Delete lead">×</button></td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -1068,14 +1068,11 @@ return (
           {/* ═══ ROOM RENTAL INPUT TAB ═══ */}
           {activeTab === "rentalInput" && (
             <div>
-              <ChartCard title="📝 Weekly Room Rental Input" subtitle="Enter weekly rental amounts per therapist — supports room rental, marketing & testing amounts per entry">
+              <ChartCard title="Weekly Room Rental Input" subtitle="Enter weekly rental amounts per therapist — supports room rental, marketing & testing amounts per entry">
                 {rentalMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: rentalMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: rentalMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{rentalMsg.text}</div>}
                 <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16}}>
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week Start (Monday) *</label><input type="date" value={rentalForm.week_start} onChange={e => setRentalForm({...rentalForm, week_start: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week End (Sunday) *</label><input type="date" value={rentalForm.week_end} onChange={e => setRentalForm({...rentalForm, week_end: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
-                </div>
-                <div style={{fontSize:11, color:C.textMuted, marginBottom:12, padding:"6px 10px", background:"#1a1a2e", borderRadius:6, border:"1px solid #2a2a4a"}}>
-                  📅 Dates auto-populated: Monday–Sunday. Updates each Tuesday to current week. Your assistant enters on Monday for the prior week.
                 </div>
                 <div style={{fontSize:12, fontWeight:700, color:C.textMuted, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5}}>Therapist Entries</div>
                 {rentalForm.entries.map((entry, idx) => (
@@ -1085,7 +1082,7 @@ return (
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Room Rental ($)</label><input type="number" step="0.01" value={entry.amount_room} onChange={e => updateRentalRow(idx, 'amount_room', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Marketing ($)</label><input type="number" step="0.01" value={entry.amount_mkt} onChange={e => updateRentalRow(idx, 'amount_mkt', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Testing ($)</label><input type="number" step="0.01" value={entry.amount_test} onChange={e => updateRentalRow(idx, 'amount_test', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
-                    <button onClick={() => removeRentalRow(idx)} style={{background:"transparent", border:"1px solid #E85D7540", color:C.rose, cursor:"pointer", fontSize:16, padding:"6px 10px", borderRadius:6, marginBottom:2, lineHeight:1, display:"flex", alignItems:"center", justifyContent:"center"}} title="Remove row">✕</button>
+                    <button onClick={() => removeRentalRow(idx)} style={{background:"transparent", border:"1px solid #E85D7540", color:C.rose, cursor:"pointer", fontSize:16, padding:"6px 10px", borderRadius:6, marginBottom:2, lineHeight:1, display:"flex", alignItems:"center", justifyContent:"center"}} title="Remove row">×</button>
                   </div>
                 ))}
                 <div style={{display:"flex", gap:12, marginTop:12}}>
