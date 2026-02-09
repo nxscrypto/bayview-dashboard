@@ -167,21 +167,7 @@ function BayviewDashboard() {
   const [sessionsExpanded, setSessionsExpanded] = useState({});
 
     // Rental Input state
-    const [rentalForm, setRentalForm] = useState(() => {
-          const autoWeek = getAutoWeekDates();
-          return {
-            week_start: autoWeek.week_start,
-            week_end: autoWeek.week_end,
-            entries: [{ therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '' }]
-          };
-        });
-    const [rentalMsg, setRentalMsg] = useState(null);
-    const [rentalWeekEntries, setRentalWeekEntries] = useState([]);
-    const [rentalLoadingEntries, setRentalLoadingEntries] = useState(false);
-    const [editingRentalWeek, setEditingRentalWeek] = useState(null);
-
-    const RENTAL_LOCATIONS = ["FTL", "CS", "PL", "Testing", "MKT"];
-    const RENTAL_CATEGORIES = ["room_rental", "marketing", "testing"];
+    
 
         // Auto-calculate Monday-Sunday week dates
         const getAutoWeekDates = () => {
@@ -215,6 +201,22 @@ function BayviewDashboard() {
           "Dr. Brittany", "BTI Nova", "Jessica C", "Crystal A",
           "Dr Michael Collins", "Lorena A", "Dr. Halle S"
         ].sort();
+
+        const [rentalForm, setRentalForm] = useState(() => {
+          const autoWeek = getAutoWeekDates();
+          return {
+            week_start: autoWeek.week_start,
+            week_end: autoWeek.week_end,
+            entries: [{ therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '' }]
+          };
+        });
+    const [rentalMsg, setRentalMsg] = useState(null);
+    const [rentalWeekEntries, setRentalWeekEntries] = useState([]);
+    const [rentalLoadingEntries, setRentalLoadingEntries] = useState(false);
+    const [editingRentalWeek, setEditingRentalWeek] = useState(null);
+
+    const RENTAL_LOCATIONS = ["FTL", "CS", "PL", "Testing", "MKT"];
+    const RENTAL_CATEGORIES = ["room_rental", "marketing", "testing"];
 
     const addRentalRow = () => setRentalForm(f => ({...f, entries: [...f.entries, { therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '' }]}));
     const removeRentalRow = (idx) => setRentalForm(f => ({...f, entries: f.entries.filter((_, i) => i !== idx)}));
