@@ -1397,12 +1397,13 @@ return (
           <>
 
             {/* KPIs */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 16, marginBottom: 24 }}>
               <StatCard label="Total Revenue" value={fmtCurrency(rp.gt || 0)} icon="💰" color={C.accent} sub={`${rp.weeks || 0} weeks`} prev={prevPeriod?.gt} prevLabel={rpLabel} />
               <StatCard label="Fort Lauderdale" value={fmtCurrency(rp.ftl || 0)} icon="🏢" color={C.blue} sub={rp.gt ? `${Math.round((rp.ftl||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.ftl} prevLabel={rpLabel} />
               <StatCard label="Coral Springs" value={fmtCurrency(rp.cs || 0)} icon="🏢" color={C.warm} sub={rp.gt ? `${Math.round((rp.cs||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.cs} prevLabel={rpLabel} />
               <StatCard label="Plantation" value={fmtCurrency(rp.pl || 0)} icon="🏢" color={C.purple} sub={rp.gt ? `${Math.round((rp.pl||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.pl} prevLabel={rpLabel} />
               <StatCard label="Testing Revenue" value={fmtCurrency(rp.testing || 0)} icon="🧪" color={C.rose} sub={rp.gt ? `${Math.round((rp.testing||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.testing} prevLabel={rpLabel} />
+              <StatCard label="Total Amount" value={fmtCurrency(((rp.gt || 0) - (rp.mkt || 0) - (rp.testing || 0)) + (rp.mkt || 0) + (rp.testing || 0))} icon="💵" color={C.accent} sub={`Rental: ${fmtCurrency((rp.gt||0)-(rp.mkt||0)-(rp.testing||0))} + Mkt: ${fmtCurrency(rp.mkt||0)} + Test: ${fmtCurrency(rp.testing||0)}`} />
               <StatCard label="Avg per Week" value={fmtCurrency(rp.avgWeek || 0)} icon="📈" color="#8b5cf6" sub={`Marketing: ${fmtCurrency(rp.mkt||0)}`} prev={prevPeriod?.avgWeek} prevLabel={rpLabel} />
             </div>
 
