@@ -241,11 +241,13 @@ function BayviewDashboard() {
 
     // Fetch session data for rental auto-population
     const fetchRentalSessions = () => {
+      console.log('[RENTAL] fetchRentalSessions called');
       if (rentalSessionsCache) return Promise.resolve(rentalSessionsCache);
       setRentalSessionsLoading(true);
       return fetch('/api/sessions?weeks=1')
         .then(r => r.json())
         .then(data => {
+          console.log('[RENTAL] fetch resolved, data keys:', Object.keys(data));
           const summary = data.therapist_summary || [];
           setRentalSessionsCache(summary);
           setRentalSessionsLoading(false);
@@ -287,6 +289,7 @@ function BayviewDashboard() {
         });
       };
       if (rentalSessionsCache) {
+      console.log('[RENTAL] about to check cache, cache is:', rentalSessionsCache);
         doPopulate(rentalSessionsCache);
       } else {
         fetchRentalSessions().then(summary => doPopulate(summary));
