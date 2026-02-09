@@ -261,29 +261,42 @@ function BayviewDashboard() {
 
     // Handle therapist selection - auto-populate location rows with session counts
     // Handle therapist selection - auto-populate location rows with session counts
+    // Handle therapist selection - auto-populate location rows with session counts
     const handleTherapistSelect = (idx, value) => {
-      updateRentalRow(idx, "therapist", value);
-      if (!value) return;
-      const doPopulate = (summary) => {
-        const match = matchTherapistToSession(value, summary);
-        if (!match || !match.by_location) return;
-        const locs = Object.entries(match.by_location);
-        if (locs.length === 0) return;
-        const merged = {};
-        for (const [loc, count] of locs) {
-          const code = LOCATION_REVERSE[loc] || 'FTL';
-          merged[code] = (merged[code] || 0) + count;
-        }
-        const locEntries = Object.entries(merged);
+      if (!value) { updateRentalRow(idx, "therapist", value); return; }
+      const populateWithData = (summary) => {
         setRentalForm(f => {
           const newEntries = [...f.entries];
-          newEntries[idx] = {...newEntries[idx], therapist: value, location: locEntries[0][0], sessions: String(locEntries[0][1])};
-          for (let i = 1; i < locEntries.length; i++) {
-            newEntries.splice(idx + i, 0, {therapist: value, location: locEntries[i][0], sessions: String(locEntries[i][1]), amount_room: '', amount_mkt: '', amount_test: '', notes: ''});
+          newEntries[idx] = {...newEntries[idx], therapist: value};
+          if (summary && summary.length > 0) {
+            const match = matchTherapistToSession(value, summary);
+            if (match && match.by_location) {
+              const locs = Object.entries(match.by_location);
+              if (locs.length > 0) {
+                const merged = {};
+                for (const [loc, count] of locs) {
+                  const code = LOCATION_REVERSE[loc] || 'FTL';
+                  merged[code] = (merged[code] || 0) + count;
+                }
+                const locEntries = Object.entries(merged);
+                newEntries[idx] = {...newEntries[idx], location: locEntries[0][0], sessions: String(locEntries[0][1])};
+                for (let i = 1; i < locEntries.length; i++) {
+                  newEntries.splice(idx + i, 0, {therapist: value, location: locEntries[i][0], sessions: String(locEntries[i][1]), amount_room: '', amount_mkt: '', amount_test: '', notes: ''});
+                }
+              }
+            }
           }
           return {...f, entries: newEntries};
         });
       };
+      const cached = rentalSessionsRef.current;
+      if (cached) {
+        populateWithData(cached);
+      } else {
+        updateRentalRow(idx, "therapist", value);
+        fetchRentalSessions().then(function(summary) { populateWithData(summary); });
+      }
+    };
       // Use ref for synchronous cache check
       if (rentalSessionsRef.current) {
         doPopulate(rentalSessionsRef.current);
