@@ -274,7 +274,7 @@ function BayviewDashboard() {
                   else if (ent.category === 'testing') grouped[key].amount_test = String(ent.amount);
                   if (ent.notes) grouped[key].notes = ent.notes;
                 });
-                setRentalForm({week_start: ws, week_end: we, entries: Object.values(grouped)}); setRentalMsg({type:"success",text:"Editing week " + ws + " \u2014 " + we + ". Make changes and click Update."});
+                setRentalForm({week_start: ws, week_end: we, entries: Object.values(grouped)}); setRentalMsg({type:"success",text:"Editing week " + ws + " — " + we + ". Make changes and click Update."});
           }
         });
     };
@@ -384,7 +384,7 @@ function BayviewDashboard() {
     { id: "rental", label: "🏠 Room Rental" },
     { id: "team", label: "Team" },
           { id: "intake", label: "Lead Intake" },
-          { id: "rentalInput", label: "\ud83d\udcdd Room Rental Input" },
+          { id: "rentalInput", label: "📝 Room Rental Input" },
     { id: "sessions", label: "Sessions" },
   ];
   const filterBtns = [
@@ -931,7 +931,7 @@ return (
 
             {/* Referral Tracking: Insurance & Medicaid */}
             {(stats.referrals && stats.referrals.length > 0) && (
-              <ChartCard title="Referred Out \u2014 Insurance & Medicaid" subtitle="Leads referred to insurance or medicaid providers" style={{ marginBottom: 16 }}>
+              <ChartCard title="Referred Out — Insurance & Medicaid" subtitle="Leads referred to insurance or medicaid providers" style={{ marginBottom: 16 }}>
                 <div style={{ maxHeight: 300, overflowY: "auto", paddingRight: 8 }}>
                   {stats.referrals.map((member, i) => (
                     <RankRow key={member.name} rank={i + 1} name={member.name} count={member.leads} booked={member.booked} rate={member.rate} max={stats.referrals[0]?.leads || 1} color="#EAB308" />
@@ -1068,14 +1068,14 @@ return (
           {/* ═══ ROOM RENTAL INPUT TAB ═══ */}
           {activeTab === "rentalInput" && (
             <div>
-              <ChartCard title="\ud83d\udcdd Weekly Room Rental Input" subtitle="Enter weekly rental amounts per therapist \u2014 supports room rental, marketing & testing amounts per entry">
+              <ChartCard title="📝 Weekly Room Rental Input" subtitle="Enter weekly rental amounts per therapist — supports room rental, marketing & testing amounts per entry">
                 {rentalMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: rentalMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: rentalMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{rentalMsg.text}</div>}
                 <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16}}>
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week Start (Monday) *</label><input type="date" value={rentalForm.week_start} onChange={e => setRentalForm({...rentalForm, week_start: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week End (Sunday) *</label><input type="date" value={rentalForm.week_end} onChange={e => setRentalForm({...rentalForm, week_end: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                 </div>
                 <div style={{fontSize:11, color:C.textMuted, marginBottom:12, padding:"6px 10px", background:"#1a1a2e", borderRadius:6, border:"1px solid #2a2a4a"}}>
-                  \ud83d\udcc5 Dates auto-populated: Monday\u2013Sunday. Updates each Tuesday to current week. Your assistant enters on Monday for the prior week.
+                  📅 Dates auto-populated: Monday–Sunday. Updates each Tuesday to current week. Your assistant enters on Monday for the prior week.
                 </div>
                 <div style={{fontSize:12, fontWeight:700, color:C.textMuted, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5}}>Therapist Entries</div>
                 {rentalForm.entries.map((entry, idx) => (
@@ -1085,7 +1085,7 @@ return (
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Room Rental ($)</label><input type="number" step="0.01" value={entry.amount_room} onChange={e => updateRentalRow(idx, 'amount_room', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Marketing ($)</label><input type="number" step="0.01" value={entry.amount_mkt} onChange={e => updateRentalRow(idx, 'amount_mkt', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Testing ($)</label><input type="number" step="0.01" value={entry.amount_test} onChange={e => updateRentalRow(idx, 'amount_test', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
-                    <button onClick={() => removeRentalRow(idx)} style={{background:"transparent", border:"1px solid #E85D7540", color:C.rose, cursor:"pointer", fontSize:16, padding:"6px 10px", borderRadius:6, marginBottom:2, lineHeight:1, display:"flex", alignItems:"center", justifyContent:"center"}} title="Remove row">\u2715</button>
+                    <button onClick={() => removeRentalRow(idx)} style={{background:"transparent", border:"1px solid #E85D7540", color:C.rose, cursor:"pointer", fontSize:16, padding:"6px 10px", borderRadius:6, marginBottom:2, lineHeight:1, display:"flex", alignItems:"center", justifyContent:"center"}} title="Remove row">✕</button>
                   </div>
                 ))}
                 <div style={{display:"flex", gap:12, marginTop:12}}>
@@ -1096,7 +1096,7 @@ return (
               </ChartCard>
 
               {rentalForm.week_start && rentalForm.week_end && (
-                <ChartCard title={"Entries for " + rentalForm.week_start + " \u2014 " + rentalForm.week_end} style={{marginTop:16}}>
+                <ChartCard title={"Entries for " + rentalForm.week_start + " — " + rentalForm.week_end} style={{marginTop:16}}>
                   <button onClick={() => loadRentalWeek(rentalForm.week_start, rentalForm.week_end)} style={{padding:"6px 16px", background:C.accent, color:"#0B0E11", border:"none", borderRadius:6, fontWeight:600, cursor:"pointer", fontSize:12, marginBottom:12}}>Load Entries</button>
                   {rentalLoadingEntries ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>Loading...</div>
                   : rentalWeekEntries.length === 0 ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>No entries for this week yet</div>
@@ -1193,7 +1193,7 @@ return (
                       const weekLocations = Object.keys(week.locations);
                       if (weekSummary.length === 0) return null;
                       return (
-                        <ChartCard title={"Week Summary \u2014 " + week.week_label} style={{ marginBottom: 16 }}>
+                        <ChartCard title={"Week Summary — " + week.week_label} style={{ marginBottom: 16 }}>
                           <div style={{ overflowX: "auto" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                               <thead>
