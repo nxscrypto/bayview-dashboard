@@ -755,6 +755,34 @@ return (
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <ChartCard title="Leads by Day of Week" subtitle="4-week average — ranked highest to lowest">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={PRECOMPUTED._dayOfWeekAvg || []} layout="vertical" margin={{ left: 20, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="day" type="category" tick={{ fontSize: 11, fill: C.textMuted }} axisLine={false} tickLine={false} width={80} />
+                    <Tooltip content={<Tip />} />
+                    <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: 11, color: C.textMuted }} />
+                    <Bar dataKey="leads" name="Avg Leads" fill={C.accent} radius={[0, 4, 4, 0]} barSize={18} />
+                    <Bar dataKey="booked" name="Avg Booked" fill={C.blue} radius={[0, 4, 4, 0]} barSize={18} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Booking Rate by Day" subtitle="4-week avg — which days convert best">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={(PRECOMPUTED._dayOfWeekAvg || []).map(d => ({...d, rate: d.leads ? Math.round(d.booked / d.leads * 100) : 0})).sort((a, b) => b.rate - a.rate)} layout="vertical" margin={{ left: 20, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
+                    <YAxis dataKey="day" type="category" tick={{ fontSize: 11, fill: C.textMuted }} axisLine={false} tickLine={false} width={80} />
+                    <Tooltip content={<Tip />} />
+                    <Bar dataKey="rate" name="Booking %" fill={C.warm} radius={[0, 4, 4, 0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <ChartCard title="Cumulative Leads vs Booked" subtitle="Running totals — gap = unconverted pipeline">
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={cumulative}>
