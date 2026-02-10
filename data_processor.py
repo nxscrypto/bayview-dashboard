@@ -565,6 +565,12 @@ def process_rental(rows):
     this_year = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year]
     last_year = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year - 1]
     this_month = [w for w in weekly if w.get("end_date", w["start_date"]).year == today.year and w.get("end_date", w["start_date"]).month == today.month]
+
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+    this_week = [w for w in weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= week_end and w["end_date"] >= week_start]
+    today_data = [w for w in weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= today <= w["end_date"]]
+
     lm = (date(today.year, today.month, 1) - timedelta(days=1))
     last_month = [w for w in weekly if w.get("end_date", w["start_date"]).year == lm.year and w.get("end_date", w["start_date"]).month == lm.month]
     prev_ytd_end = date(today.year - 1, today.month, today.day)
@@ -580,19 +586,25 @@ def process_rental(rows):
         "ytd": period_summary(this_year),
         "lastYear": period_summary(last_year),
         "thisMonth": period_summary(this_month),
+        "thisWeek": period_summary(this_week),
+        "today": period_summary(today_data),
         "lastMonth": period_summary(last_month),
         "prevYtd": period_summary(prev_ytd),
         "prevLy": period_summary(prev_ly),
         "ytdTherapists": period_therapists(this_year),
         "lyTherapists": period_therapists(last_year),
         "thisMonthTherapists": period_therapists(this_month),
+        "thisWeekTherapists": period_therapists(this_week),
+        "todayTherapists": period_therapists(today_data),
         "lastMonthTherapists": period_therapists(last_month),
         "mktYtdTherapists": period_therapists(this_year, loc_filter=["MKT"]),
         "mktLyTherapists": period_therapists(last_year, loc_filter=["MKT"]),
         "mktThisMonthTherapists": period_therapists(this_month, loc_filter=["MKT"]),
+        "mktThisWeekTherapists": period_therapists(this_week, loc_filter=["MKT"]),
         "testYtdTherapists": period_therapists(this_year, loc_filter=["Testing"]),
         "testLyTherapists": period_therapists(last_year, loc_filter=["Testing"]),
         "testThisMonthTherapists": period_therapists(this_month, loc_filter=["Testing"]),
+        "testThisWeekTherapists": period_therapists(this_week, loc_filter=["Testing"]),
     }
 
 
