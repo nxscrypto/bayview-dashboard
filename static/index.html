@@ -354,13 +354,13 @@ function BayviewDashboard() {
         fetch("/api/rental/week/delete", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({week_start: rentalForm.week_start, week_end: rentalForm.week_end})})
           .then(() => fetch("/api/rental", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({week_start: rentalForm.week_start, week_end: rentalForm.week_end, entries: validEntries})}))
           .then(r => r.json()).then(d => {
-            if (d.ok) { setRentalMsg({type:"success",text:"Week updated! " + d.count + " entries saved."}); setEditingRentalWeek(null); loadRentalWeek(rentalForm.week_start, rentalForm.week_end); refreshDashboardData(); }
+            if (d.ok) { setRentalMsg({type:"success",text:"Week updated! " + d.count + " entries saved."}); setEditingRentalWeek(null); loadRentalWeek(rentalForm.week_start, rentalForm.week_end); refreshDashboardData(); setRentalForm(f => ({...f, entries: [{ therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '', sessions: '' }]})); }
             else setRentalMsg({type:"error",text:d.error || "Save failed"});
           }).catch(() => setRentalMsg({type:"error",text:"Network error"}));
       } else {
         fetch("/api/rental", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({week_start: rentalForm.week_start, week_end: rentalForm.week_end, entries: validEntries})})
           .then(r => r.json()).then(d => {
-            if (d.ok) { setRentalMsg({type:"success",text:"Saved! " + d.count + " entries."}); loadRentalWeek(rentalForm.week_start, rentalForm.week_end); refreshDashboardData(); }
+            if (d.ok) { setRentalMsg({type:"success",text:"Saved! " + d.count + " entries."}); loadRentalWeek(rentalForm.week_start, rentalForm.week_end); refreshDashboardData(); setRentalForm(f => ({...f, entries: [{ therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '', sessions: '' }]})); }
             else setRentalMsg({type:"error",text:d.error || "Save failed"});
           }).catch(() => setRentalMsg({type:"error",text:"Network error"}));
       }
