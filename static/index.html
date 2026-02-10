@@ -552,6 +552,46 @@ function BayviewDashboard() {
         // Build a map helper function
         const buildTherapistMap = (listKey, periodMap, aliases) => {
           const R = PRECOMPUTED._rental || {};
+          const monthlyTrendData = (() => {
+            const all = R.monthly || [];
+            const dict = {};
+            all.forEach(m => { dict[m.month] = m.gt; });
+            const rows = all.slice(-24).map(m => {
+              const [yr, mo] = m.month.split("-");
+              const prevKey = String(parseInt(yr)-1) + "-" + mo;
+              return { ...m, priorYear: dict[prevKey] || null };
+            });
+            if (rows.length < 2) return rows;
+            const last = rows[rows.length - 1];
+            const parts = last.month.split("-");
+            const cy = parseInt(parts[0]);
+            const cm = parseInt(parts[1]);
+            const dInMonth = new Date(cy, cm, 0).getDate();
+            const today = new Date();
+            const daysSoFar = (today.getFullYear() === cy && (today.getMonth()+1) === cm) ? today.getDate() : dInMonth;
+            const pct = daysSoFar / dInMonth;
+            if (pct >= 1) return rows;
+            const prorated = Math.round(last.gt / pct);
+            const complete = rows.slice(0, -1).filter(r => r.weeks >= 3);
+            const recent3 = complete.slice(-3);
+            const avgWk = recent3.length ? recent3.reduce((s,r) => s + r.gt / (r.weeks || 4), 0) / recent3.length : 0;
+            const estWeeks = dInMonth / 7;
+            const trendEst = Math.round(avgWk * estWeeks);
+            const prevYr = last.priorYear;
+            let seasonalEst = null;
+            if (prevYr && complete.length >= 2) {
+              const pKeys = recent3.map(r => { const p = r.month.split("-"); return String(parseInt(p[0])-1) + "-" + p[1]; });
+              const pAvg = pKeys.reduce((s,k) => s + (dict[k]||0), 0) / pKeys.length;
+              if (pAvg > 0) seasonalEst = Math.round(prevYr * (recent3.reduce((s,r) => s + r.gt, 0) / recent3.length) / pAvg);
+            }
+            let forecast = prorated;
+            if (seasonalEst && trendEst) forecast = Math.round(trendEst * 0.5 + seasonalEst * 0.3 + prorated * 0.2);
+            else if (trendEst) forecast = Math.round(trendEst * 0.6 + prorated * 0.4);
+            const prev = rows[rows.length - 2];
+            prev.forecast = prev.gt;
+            last.forecast = forecast;
+            return rows;
+          })();
           const therapistList = R[listKey] || [];
           const map = {};
           therapistList.forEach(t => {
@@ -1589,7 +1629,7 @@ return (
             {/* Monthly Revenue Trend with Prior Year + Forecast */}
             <ChartCard title={"📊 Monthly Revenue Trend"} subtitle="Current period vs prior year — dotted blue line shows forecast" style={{ marginBottom: 16 }}>
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={(() => { const all = R.monthly || []; const dict = {}; all.forEach(m => { dict[m.month] = m.gt; }); const rows = all.slice(-24).map(m => { const [yr, mo] = m.month.split("-"); const prevKey = `${parseInt(yr)-1}-${mo}`; return { ...m, priorYear: dict[prevKey] || null }; }); if (rows.length < 2) return rows; const last = rows[rows.length - 1]; const [cy, cm] = last.month.split("-").map(Number); const dInMonth = new Date(cy, cm, 0).getDate(); const today = new Date(); const daysSoFar = today.getFullYear() === cy && (today.getMonth()+1) === cm ? today.getDate() : dInMonth; const pct = daysSoFar / dInMonth; if (pct >= 1) return rows; const prorated = Math.round(last.gt / pct); const complete = rows.slice(0, -1).filter(r => r.weeks >= 3); const recent3 = complete.slice(-3); const avgWeekly = recent3.length ? recent3.reduce((s,r) => s + r.gt / (r.weeks || 4), 0) / recent3.length : 0; const estWeeks = dInMonth / 7; const trendEst = Math.round(avgWeekly * estWeeks); const prevYr = last.priorYear; const seasonalEst = prevYr && complete.length >= 2 ? Math.round(prevYr * (recent3.reduce((s,r) => s + r.gt, 0) / recent3.length) / ((() => { const pKeys = recent3.map(r => { const [y2,m2] = r.month.split("-"); return `${parseInt(y2)-1}-${m2}`; }); const pAvg = pKeys.reduce((s,k) => s + (dict[k]||0), 0) / pKeys.length; return pAvg || 1; })())) : null; let forecast = prorated; if (seasonalEst && trendEst) forecast = Math.round(trendEst * 0.5 + seasonalEst * 0.3 + prorated * 0.2); else if (trendEst) forecast = Math.round(trendEst * 0.6 + prorated * 0.4); const prev = rows[rows.length - 2]; prev.forecast = prev.gt; last.forecast = forecast; return rows; })()}>
+                <ComposedChart data={monthlyTrendData}>
                   <defs>
                     <linearGradient id="gRental" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.accent} stopOpacity={0.3} /><stop offset="100%" stopColor={C.accent} stopOpacity={0.02} /></linearGradient>
                   </defs>
