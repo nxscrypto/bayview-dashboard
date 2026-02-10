@@ -286,7 +286,10 @@ function BayviewDashboard() {
               }
             }
           }
-          return {...f, entries: newEntries};
+          const lastEntry = newEntries[newEntries.length - 1];
+              const needsBlankRow = lastEntry && lastEntry.therapist !== '';
+              const finalEntries = needsBlankRow ? [...newEntries, { therapist: '', location: 'FTL', amount_room: '', amount_mkt: '', amount_test: '', notes: '', sessions: '' }] : newEntries;
+              return {...f, entries: finalEntries};
         });
       };
       const cached = rentalSessionsRef.current;
@@ -1267,9 +1270,7 @@ return (
                                           <td style={tdR}>{r.testing > 0 ? <span style={{color:"#f59e0b"}}>{"$"}{r.testing}</span> : <span style={{color:C.textMuted}}>—</span>}</td>
                                           <td style={tdR}><span style={{color:"#fff", fontWeight:600}}>{"$"}{rowTotal}</span></td>
                                           <td style={{...tdS, textAlign:"center"}}>
-                                            {allIds.map(id => (
-                                              <button key={id} onClick={() => deleteRentalEntry(id)} style={{background:"transparent", border:"1px solid #E85D75", color:"#E85D75", borderRadius:4, cursor:"pointer", padding:"2px 7px", fontSize:11, marginLeft:2}} title="Delete entry">✕</button>
-                                            ))}
+                                            <button onClick={() => { if (!confirm("Delete this row?")) return; allIds.forEach(id => { fetch("/api/rental/" + id, {method:"DELETE"}).then(r => r.json()).then(data => { if (data.ok) { setRentalWeekEntries(prev => prev.filter(e => e.id !== id)); } }); }); setRentalMsg({type:"success", text:"Row deleted."}); }} style={{background:"transparent", border:"1px solid #E85D75", color:"#E85D75", borderRadius:4, cursor:"pointer", padding:"2px 7px", fontSize:11}} title="Delete row">✕</button>
                                           </td>
                                         </tr>
                                       );
