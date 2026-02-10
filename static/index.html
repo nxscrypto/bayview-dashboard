@@ -317,6 +317,7 @@ function BayviewDashboard() {
       fetch("/api/rental/week?week_start=" + ws + (we ? "&week_end=" + we : ""))
         .then(r => r.json()).then(data => { setRentalWeekEntries(Array.isArray(data) ? data : []); setRentalLoadingEntries(false); })
         .catch(() => setRentalLoadingEntries(false));
+    };
 
     const deleteRentalEntry = (entryId) => {
       if (!confirm("Are you sure you want to delete this entry?")) return;
@@ -331,8 +332,6 @@ function BayviewDashboard() {
           }
         })
         .catch(() => setRentalMsg({type:"error", text:"Network error deleting entry."}));
-    };
-
     };
 
     const submitRental = () => {
