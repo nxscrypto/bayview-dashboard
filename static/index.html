@@ -499,6 +499,7 @@ function BayviewDashboard() {
     { id: "ytd", label: "Year-to-Date" },
     { id: "month", label: "This Month" },
     { id: "week", label: "This Week" },
+    { id: "lastweek", label: "Last Week" },
     { id: "today", label: "Today" },
     { id: "all", label: "All Time" },
     { id: "lastyear", label: "Last Year" },
@@ -564,9 +565,9 @@ function BayviewDashboard() {
           return map;
         };
 
-        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists" };
-        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists" };
-        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists" };
+        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists", lastweek: "lastWeekTherapists" };
+        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists", lastweek: "mktLastWeekTherapists" };
+        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists", lastweek: "testLastWeekTherapists" };
 
         const rentalTherapistMap = useMemo(() => buildTherapistMap(rentalPeriodMap[timeFilter] || "therapists", rentalPeriodMap, NAME_ALIASES), [timeFilter]);
         const mktTherapistMap = useMemo(() => buildTherapistMap(mktPeriodMap[timeFilter] || "mktTherapists", mktPeriodMap, {...NAME_ALIASES, ...MKT_ALIASES}), [timeFilter]);
@@ -614,14 +615,27 @@ function BayviewDashboard() {
         const totalAcq = teamWithFinancials.reduce((s, t) => s + t.acqCost, 0);
 
   // Date range labels
-  const dateLabels = {
-    all: "All Data · May 1, 2017 – February 6, 2026",
-    ytd: "Year-to-Date · Jan 1, 2026 – February 6, 2026",
-    lastyear: "Last Year · Jan 1, 2025 – Dec 31, 2025",
-    month: "This Month · February 1 – February 6, 2026",
-    week: "This Week · Jan 30 – February 6, 2026",
-    today: "Today · February 6, 2026",
-  };
+  const dateLabels = (() => {
+    const now = new Date();
+    const fmt = (d) => { const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return m[d.getMonth()] + " " + d.getDate(); };
+    const fmtFull = (d) => { const m = ["January","February","March","April","May","June","July","August","September","October","November","December"]; return m[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear(); };
+    const dow = now.getDay();
+    const mon = new Date(now); mon.setDate(now.getDate() - ((dow + 6) % 7));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const lm = new Date(mon); lm.setDate(mon.getDate() - 7);
+    const ls = new Date(mon); ls.setDate(mon.getDate() - 1);
+    const ms = new Date(now.getFullYear(), now.getMonth(), 1);
+    const ys = new Date(now.getFullYear(), 0, 1);
+    return {
+      all: "All Data \u00b7 May 1, 2017 \u2013 " + fmtFull(now),
+      ytd: "Year-to-Date \u00b7 " + fmt(ys) + " \u2013 " + fmtFull(now),
+      lastyear: "Last Year \u00b7 Jan 1, " + (now.getFullYear()-1) + " \u2013 Dec 31, " + (now.getFullYear()-1),
+      month: "This Month \u00b7 " + fmt(ms) + " \u2013 " + fmtFull(now),
+      week: "This Week \u00b7 " + fmt(mon) + " \u2013 " + fmtFull(sun),
+      lastweek: "Last Week \u00b7 " + fmt(lm) + " \u2013 " + fmtFull(ls),
+      today: "Today \u00b7 " + fmtFull(now),
+    };
+  })()
 
   
   // Sessions data fetching
@@ -1463,13 +1477,13 @@ return (
         {/* ═══ ROOM RENTAL TAB ═══ */}
         {activeTab === "rental" && (() => {
           const R = PRECOMPUTED._rental || {};
-            const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth, thisWeek: R.thisWeek, today: R.today };
-            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", week: "thisWeek", today: "today", all: "allTime", lastyear: "lastYear" };
+            const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth, thisWeek: R.thisWeek, lastWeek: R.lastWeek, today: R.today };
+            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", week: "thisWeek", today: "today", all: "allTime", lastyear: "lastYear", lastweek: "lastWeek" };
             const rentalPeriod = rentalPeriodMap[timeFilter] || "ytd";
           const rp = periods[rentalPeriod] || R.allTime || {};
-          const rpTherapists = rentalPeriod === "ytd" ? R.ytdTherapists : rentalPeriod === "lastYear" ? R.lyTherapists : rentalPeriod === "thisMonth" ? R.thisMonthTherapists : R.therapists;
-          const prevPeriod = rentalPeriod === "ytd" ? R.prevYtd : rentalPeriod === "thisMonth" ? R.lastMonth : rentalPeriod === "lastYear" ? R.prevLy : null;
-          const rpLabel = rentalPeriod === "ytd" ? "vs same period last year" : rentalPeriod === "thisMonth" ? "vs last month" : rentalPeriod === "lastYear" ? "vs prior year" : "";
+          const rpTherapists = rentalPeriod === "ytd" ? R.ytdTherapists : rentalPeriod === "lastYear" ? R.lyTherapists : rentalPeriod === "thisMonth" ? R.thisMonthTherapists : rentalPeriod === "lastWeek" ? R.lastWeekTherapists : R.therapists;
+          const prevPeriod = rentalPeriod === "ytd" ? R.prevYtd : rentalPeriod === "thisMonth" ? R.lastMonth : rentalPeriod === "lastYear" ? R.prevLy : rentalPeriod === "lastWeek" ? null : null;
+          const rpLabel = rentalPeriod === "ytd" ? "vs same period last year" : rentalPeriod === "thisMonth" ? "vs last month" : rentalPeriod === "lastYear" ? "vs prior year" : rentalPeriod === "lastWeek" ? "" : "";
 
           // Location pie data
           const locData = [
