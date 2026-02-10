@@ -734,7 +734,7 @@ return (
                     <Tooltip content={<Tip />} />
                     <Legend verticalAlign="top" height={36} iconType="line" wrapperStyle={{ fontSize: 11, color: C.textMuted }} />
                     <Area type="monotone" dataKey="leads" name="Leads" stroke={C.accent} fill="url(#gLeads)" strokeWidth={2} />
-                    <Line type="monotone" dataKey="booked" name="Booked" stroke={C.blue} strokeWidth={2} dot={false} />
+                    <Area type="monotone" dataKey="booked" name="Booked" stroke={C.blue} fill="url(#gBooked)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
