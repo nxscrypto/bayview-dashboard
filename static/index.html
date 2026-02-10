@@ -546,9 +546,9 @@ function BayviewDashboard() {
           return map;
         };
 
-        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisMonthTherapists", today: "thisMonthTherapists", all: "therapists", lastyear: "lyTherapists" };
-        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisMonthTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists" };
-        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisMonthTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists" };
+        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists" };
+        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists" };
+        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists" };
 
         const rentalTherapistMap = useMemo(() => buildTherapistMap(rentalPeriodMap[timeFilter] || "therapists", rentalPeriodMap, NAME_ALIASES), [timeFilter]);
         const mktTherapistMap = useMemo(() => buildTherapistMap(mktPeriodMap[timeFilter] || "mktTherapists", mktPeriodMap, {...NAME_ALIASES, ...MKT_ALIASES}), [timeFilter]);
@@ -1370,8 +1370,8 @@ return (
         {/* ═══ ROOM RENTAL TAB ═══ */}
         {activeTab === "rental" && (() => {
           const R = PRECOMPUTED._rental || {};
-            const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth };
-            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", week: "thisMonth", today: "thisMonth", all: "allTime", lastyear: "lastYear" };
+            const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth, thisWeek: R.thisWeek, today: R.today };
+            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", week: "thisWeek", today: "today", all: "allTime", lastyear: "lastYear" };
             const rentalPeriod = rentalPeriodMap[timeFilter] || "ytd";
           const rp = periods[rentalPeriod] || R.allTime || {};
           const rpTherapists = rentalPeriod === "ytd" ? R.ytdTherapists : rentalPeriod === "lastYear" ? R.lyTherapists : rentalPeriod === "thisMonth" ? R.thisMonthTherapists : R.therapists;
