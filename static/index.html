@@ -1206,24 +1206,99 @@ return (
                   {rentalLoadingEntries ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>Loading...</div>
                   : rentalWeekEntries.length === 0 ? <div style={{color:C.textMuted, padding:16, textAlign:"center"}}>No entries for this week yet</div>
                   : <div style={{overflowX:"auto"}}>
-                      <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
-                        <thead><tr style={{borderBottom:"1px solid #2a2a4a"}}>
-                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Therapist</th>
-                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Location</th>
-                          <th style={{padding:"8px 6px", textAlign:"right", color:C.textMuted, fontWeight:600}}>Amount</th>
-                          <th style={{padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600}}>Category</th>
-                <th style={{padding:"8px 6px", textAlign:"center", color:C.textMuted, fontWeight:600}}>Actions</th>
-                        </tr></thead>
-                        <tbody>{rentalWeekEntries.map(ent => (
-                          <tr key={ent.id} style={{borderBottom:"1px solid #1a1a2e"}}>
-                            <td style={{padding:"8px 6px", color:C.text, fontWeight:600}}>{ent.therapist}</td>
-                            <td style={{padding:"8px 6px", color:C.textMuted}}>{ent.location}</td>
-                            <td style={{padding:"8px 6px", textAlign:"right", color:C.accent, fontWeight:700}}>{"$" + parseFloat(ent.amount).toLocaleString()}</td>
-                            <td style={{padding:"8px 6px", color:C.textMuted}}>{ent.category}</td>
-                <td style={{padding:"8px 6px", textAlign:"center"}}><button onClick={() => deleteRentalEntry(ent.id)} style={{background:"transparent", border:"1px solid #E85D75", color:"#E85D75", cursor:"pointer", padding:"2px 10px", borderRadius:4, fontSize:11}} title="Delete entry">✕</button></td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
+                      {(() => {
+                        const grouped = {};
+                        rentalWeekEntries.forEach(ent => {
+                          const key = ent.therapist + '|' + ent.location;
+                          if (!grouped[key]) grouped[key] = { therapist: ent.therapist, location: ent.location, room_rental: 0, marketing: 0, testing: 0, ids: {} };
+                          const amt = parseFloat(ent.amount) || 0;
+                          if (ent.category === 'room_rental') { grouped[key].room_rental += amt; grouped[key].ids.room_rental = ent.id; }
+                          else if (ent.category === 'marketing') { grouped[key].marketing += amt; grouped[key].ids.marketing = ent.id; }
+                          else if (ent.category === 'testing') { grouped[key].testing += amt; grouped[key].ids.testing = ent.id; }
+                        });
+                        const rows = Object.values(grouped);
+                        const byTherapist = {};
+                        rows.forEach(r => {
+                          if (!byTherapist[r.therapist]) byTherapist[r.therapist] = [];
+                          byTherapist[r.therapist].push(r);
+                        });
+                        const therapistNames = Object.keys(byTherapist);
+                        const grandRoom = rows.reduce((s, r) => s + r.room_rental, 0);
+                        const grandMkt = rows.reduce((s, r) => s + r.marketing, 0);
+                        const grandTest = rows.reduce((s, r) => s + r.testing, 0);
+                        const grandTotal = grandRoom + grandMkt + grandTest;
+                        const thS = {padding:"8px 6px", textAlign:"left", color:C.textMuted, fontWeight:600};
+                        const thR = {...thS, textAlign:"right"};
+                        const tdS = {padding:"8px 6px", color:C.text};
+                        const tdR = {...tdS, textAlign:"right"};
+                        const subS = {padding:"8px 6px", fontWeight:700, color:C.accent, borderTop:"1px solid " + C.accent + "44", borderBottom:"2px solid " + C.accent + "44"};
+                        const subR = {...subS, textAlign:"right"};
+                        const gS = {padding:"10px 6px", fontWeight:700, color:"#fff", background:"#1a2636", borderTop:"2px solid " + C.accent};
+                        const gR = {...gS, textAlign:"right"};
+                        return (
+                          <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
+                            <thead><tr style={{borderBottom:"1px solid #2a2a4a"}}>
+                              <th style={thS}>Therapist</th>
+                              <th style={thS}>Location</th>
+                              <th style={thR}>Room Rental ($)</th>
+                              <th style={thR}>Marketing ($)</th>
+                              <th style={thR}>Testing ($)</th>
+                              <th style={thR}>Total ($)</th>
+                              <th style={{...thS, textAlign:"center"}}>Actions</th>
+                            </tr></thead>
+                            <tbody>
+                              {therapistNames.map((tName, tIdx) => {
+                                const tRows = byTherapist[tName];
+                                const subRoom = tRows.reduce((s, r) => s + r.room_rental, 0);
+                                const subMkt = tRows.reduce((s, r) => s + r.marketing, 0);
+                                const subTest = tRows.reduce((s, r) => s + r.testing, 0);
+                                const subTotal = subRoom + subMkt + subTest;
+                                return (
+                                  <React.Fragment key={tName}>
+                                    {tRows.map((r, rIdx) => {
+                                      const rowTotal = r.room_rental + r.marketing + r.testing;
+                                      const allIds = Object.values(r.ids);
+                                      return (
+                                        <tr key={tName + '-' + rIdx} style={{borderBottom:"1px solid #1a1a3a"}}>
+                                          <td style={tdS}>{rIdx === 0 ? r.therapist : ''}</td>
+                                          <td style={tdS}>{r.location}</td>
+                                          <td style={tdR}>{r.room_rental > 0 ? <span style={{color:C.accent}}>{"$"}{r.room_rental}</span> : <span style={{color:C.textMuted}}>—</span>}</td>
+                                          <td style={tdR}>{r.marketing > 0 ? <span style={{color:"#a78bfa"}}>{"$"}{r.marketing}</span> : <span style={{color:C.textMuted}}>—</span>}</td>
+                                          <td style={tdR}>{r.testing > 0 ? <span style={{color:"#f59e0b"}}>{"$"}{r.testing}</span> : <span style={{color:C.textMuted}}>—</span>}</td>
+                                          <td style={tdR}><span style={{color:"#fff", fontWeight:600}}>{"$"}{rowTotal}</span></td>
+                                          <td style={{...tdS, textAlign:"center"}}>
+                                            {allIds.map(id => (
+                                              <button key={id} onClick={() => deleteRentalEntry(id)} style={{background:"transparent", border:"1px solid #E85D75", color:"#E85D75", borderRadius:4, cursor:"pointer", padding:"2px 7px", fontSize:11, marginLeft:2}} title="Delete entry">✕</button>
+                                            ))}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                    {tRows.length > 0 && (
+                                      <tr>
+                                        <td style={subS} colSpan={2}>{tName} — Subtotal</td>
+                                        <td style={subR}>{"$"}{subRoom}</td>
+                                        <td style={subR}>{"$"}{subMkt}</td>
+                                        <td style={subR}>{"$"}{subTest}</td>
+                                        <td style={subR}>{"$"}{subTotal}</td>
+                                        <td style={subS}></td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
+                              <tr>
+                                <td style={gS} colSpan={2}>Grand Total</td>
+                                <td style={gR}>{"$"}{grandRoom}</td>
+                                <td style={gR}>{"$"}{grandMkt}</td>
+                                <td style={gR}>{"$"}{grandTest}</td>
+                                <td style={gR}>{"$"}{grandTotal}</td>
+                                <td style={gS}></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        );
+                      })()}
                       <div style={{marginTop:12}}>
                         <button onClick={() => loadWeekForEdit(rentalForm.week_start, rentalForm.week_end)} style={{padding:"6px 16px", background:"#F59E0B", color:"#0B0E11", border:"none", borderRadius:6, fontWeight:600, cursor:"pointer", fontSize:12}}>Edit This Week</button>
                       </div>
