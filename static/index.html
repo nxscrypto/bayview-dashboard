@@ -726,13 +726,15 @@ return (
                   <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="gLeads" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.accent} stopOpacity={0.3} /><stop offset="100%" stopColor={C.accent} stopOpacity={0.02} /></linearGradient>
-                    </defs>
+                    
+                      <linearGradient id="gBooked" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.blue} stopOpacity={0.3} /><stop offset="100%" stopColor={C.blue} stopOpacity={0.02} /></linearGradient></defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
                     <XAxis dataKey="date" tick={{ fontSize: 9, fill: C.textMuted }} axisLine={false} tickLine={false} interval={useMonthly ? "preserveStartEnd" : Math.floor(chartData.length / 8)} />
                     <YAxis tick={{ fontSize: 10, fill: C.textMuted }} axisLine={false} tickLine={false} />
                     <Tooltip content={<Tip />} />
+                    <Legend verticalAlign="top" height={36} iconType="line" wrapperStyle={{ fontSize: 11, color: C.textMuted }} />
                     <Area type="monotone" dataKey="leads" name="Leads" stroke={C.accent} fill="url(#gLeads)" strokeWidth={2} />
-                    <Line type="monotone" dataKey="booked" name="Booked" stroke={C.warm} strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                    <Line type="monotone" dataKey="booked" name="Booked" stroke={C.blue} strokeWidth={2} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
