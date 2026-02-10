@@ -9,7 +9,7 @@ import io
 import logging
 
 try:
-    from database import get_leads_for_dashboard
+    from database import get_leads_for_dashboard, get_all_rental_entries
     HAS_DB = True
 except ImportError:
     HAS_DB = False
@@ -409,6 +409,87 @@ def process_leads(rows):
 # Process rental CSV rows
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Convert DB rental entries to weekly format for merging
+# ──────────────────────────────────────────────────────────────────────────────
+def convert_db_rental():
+    """Fetch rental entries from SQLite DB and convert to weekly + therapist format."""
+    if not HAS_DB:
+        return [], []
+    try:
+        db_rows = get_all_rental_entries()
+    except Exception as e:
+        logger.warning("Could not load DB rental entries: %s", e)
+        return [], []
+
+    # Group by week
+    week_map = defaultdict(lambda: {"total": 0, "cs": 0, "ftl": 0, "pl": 0, "mkt": 0, "testing": 0})
+    therapist_totals = defaultdict(float)
+
+    loc_map = {"FTL": "ftl", "CS": "cs", "PL": "pl"}
+
+    for row in db_rows:
+        ws = parse_date(row.get("week_start", ""))
+        we = parse_date(row.get("week_end", ""))
+        if not ws:
+            continue
+        if not we:
+            we = ws
+
+        amt = float(row.get("amount", 0))
+        if amt <= 0:
+            continue
+
+        loc = row.get("location", "FTL")
+        cat = row.get("category", "room_rental")
+        therapist = row.get("therapist", "")
+        week_key = ws.isoformat()
+
+        # Add to week totals
+        week_map[week_key]["total"] += amt
+        if cat == "marketing":
+            week_map[week_key]["mkt"] += amt
+            t_loc = "MKT"
+        elif cat == "testing":
+            week_map[week_key]["testing"] += amt
+            t_loc = "Testing"
+        else:
+            loc_key = loc_map.get(loc, "ftl")
+            week_map[week_key][loc_key] += amt
+            t_loc = loc
+
+        # Track per-therapist totals
+        if therapist:
+            therapist_totals[(therapist, therapist, t_loc)] += amt
+
+        # Store dates for later
+        if "start_date" not in week_map[week_key] or ws < week_map[week_key].get("_start_date", ws):
+            week_map[week_key]["_start_date"] = ws
+        if "end_date" not in week_map[week_key] or we > week_map[week_key].get("_end_date", we):
+            week_map[week_key]["_end_date"] = we
+
+    weekly = []
+    for week_key, wdata in sorted(week_map.items()):
+        sd = wdata.pop("_start_date", parse_date(week_key))
+        ed = wdata.pop("_end_date", sd)
+        weekly.append({
+            "week": week_key,
+            "total": int(wdata["total"]),
+            "cs": int(wdata["cs"]),
+            "ftl": int(wdata["ftl"]),
+            "pl": int(wdata["pl"]),
+            "mkt": int(wdata["mkt"]),
+            "testing": int(wdata["testing"]),
+            "start_date": sd,
+            "end_date": ed,
+        })
+
+    therapists = [{"name": k[0], "col": k[1], "loc": k[2], "total": int(v)} for k, v in therapist_totals.items()]
+
+    logger.info("Loaded %d rental weeks, %d therapist entries from DB", len(weekly), len(therapists))
+    return weekly, therapists
+
+
 def process_rental(rows):
     headers = rows[0]
     therapist_cols = []
@@ -688,6 +769,208 @@ def build_cashflow(leads, rental_weekly):
 # Main entry point — returns the full PRECOMPUTED dict
 # ──────────────────────────────────────────────────────────────────────────────
 
+def merge_rental_data(rental, db_weekly, db_therapists):
+    """Merge DB rental weekly/therapist data into the Google Sheet rental dict.
+    
+    Combines weekly entries (summing if same week exists), merges therapist totals,
+    and recomputes all period summaries.
+    """
+    from datetime import date, timedelta
+
+    # Rebuild full weekly list with start_date/end_date for period filtering
+    gs_weekly = []
+    for w in rental.get("weekly", []):
+        sd = parse_date(w["week"])
+        gs_weekly.append({**w, "start_date": sd, "end_date": sd + timedelta(days=6) if sd else sd})
+
+    # Merge: combine DB weeks into GS weeks
+    week_index = {w["week"]: w for w in gs_weekly}
+    for dbw in db_weekly:
+        wk = dbw["week"]
+        if wk in week_index:
+            # Same week exists in Google Sheet — add DB amounts on top
+            existing = week_index[wk]
+            existing["total"] = existing.get("total", 0) + dbw["total"]
+            existing["cs"] = existing.get("cs", 0) + dbw["cs"]
+            existing["ftl"] = existing.get("ftl", 0) + dbw["ftl"]
+            existing["pl"] = existing.get("pl", 0) + dbw["pl"]
+            existing["mkt"] = existing.get("mkt", 0) + dbw["mkt"]
+            existing["testing"] = existing.get("testing", 0) + dbw["testing"]
+        else:
+            # New week only in DB
+            gs_weekly.append(dbw)
+            week_index[wk] = dbw
+
+    gs_weekly.sort(key=lambda w: w["week"])
+
+    # Merge therapist totals
+    gs_therapists = {(t["name"], t["loc"]): t for t in rental.get("therapists", [])}
+    gs_mkt = {(t["name"], t["loc"]): t for t in rental.get("mktTherapists", [])}
+    gs_test = {(t["name"], t["loc"]): t for t in rental.get("testTherapists", [])}
+
+    for dbt in db_therapists:
+        key = (dbt["name"], dbt["loc"])
+        if dbt["loc"] == "MKT":
+            target = gs_mkt
+        elif dbt["loc"] == "Testing":
+            target = gs_test
+        else:
+            target = gs_therapists
+
+        if key in target:
+            target[key]["total"] += dbt["total"]
+        else:
+            target[key] = {**dbt}
+
+    therapists_all = sorted(list(gs_therapists.values()), key=lambda x: -x["total"])[:60]
+    mkt_all = sorted(list(gs_mkt.values()), key=lambda x: -x["total"])
+    test_all = sorted(list(gs_test.values()), key=lambda x: -x["total"])
+
+    # Recompute monthly & yearly from merged weekly
+    mon_map = defaultdict(lambda: {"gt": 0, "cs": 0, "ftl": 0, "pl": 0, "mkt": 0, "testing": 0, "weeks": 0})
+    yr_map = defaultdict(lambda: {"gt": 0, "cs": 0, "ftl": 0, "pl": 0, "mkt": 0, "testing": 0})
+    for w in gs_weekly:
+        ed = w.get("end_date") or w.get("start_date")
+        if not ed:
+            continue
+        m = ed.strftime("%Y-%m")
+        mon_map[m]["gt"] += w.get("total", 0)
+        mon_map[m]["cs"] += w.get("cs", 0)
+        mon_map[m]["ftl"] += w.get("ftl", 0)
+        mon_map[m]["pl"] += w.get("pl", 0)
+        mon_map[m]["mkt"] += w.get("mkt", 0)
+        mon_map[m]["testing"] += w.get("testing", 0)
+        mon_map[m]["weeks"] += 1
+        y = str(ed.year)
+        yr_map[y]["gt"] += w.get("total", 0)
+        yr_map[y]["cs"] += w.get("cs", 0)
+        yr_map[y]["ftl"] += w.get("ftl", 0)
+        yr_map[y]["pl"] += w.get("pl", 0)
+        yr_map[y]["mkt"] += w.get("mkt", 0)
+        yr_map[y]["testing"] += w.get("testing", 0)
+
+    rental_monthly = [{"month": k, **{kk: int(vv) for kk, vv in v.items()}} for k, v in sorted(mon_map.items())]
+    rental_yearly = [{"year": k, **{kk: int(vv) for kk, vv in v.items()}} for k, v in sorted(yr_map.items())]
+
+    # Clean weekly for output (remove internal date objects)
+    weekly_clean = [{k: v for k, v in w.items() if k not in ("start_date", "end_date")} for w in gs_weekly]
+
+    today = date.today()
+    cutoff_52 = today - timedelta(weeks=52)
+    weekly_52 = [{k: v for k, v in w.items() if k not in ("start_date", "end_date")}
+                 for w in gs_weekly if w.get("start_date") and w["start_date"] >= cutoff_52]
+
+    # Period summary helper
+    def period_summary(wdata):
+        gt = sum(w.get("total", 0) for w in wdata)
+        cs = sum(w.get("cs", 0) for w in wdata)
+        ftl = sum(w.get("ftl", 0) for w in wdata)
+        pl = sum(w.get("pl", 0) for w in wdata)
+        mkt = sum(w.get("mkt", 0) for w in wdata)
+        testing = sum(w.get("testing", 0) for w in wdata)
+        weeks = len(wdata)
+        return {"gt": int(gt), "cs": int(cs), "ftl": int(ftl), "pl": int(pl),
+                "mkt": int(mkt), "testing": int(testing), "weeks": weeks,
+                "avgWeek": int(gt / weeks) if weeks else 0}
+
+    # Period therapist helper — uses DB therapist data filtered by date range
+    def period_therapists_merged(wdata, all_therapists, loc_filter=None, n=60):
+        # For simplicity, scale therapist totals by ratio of period weeks to total weeks
+        # Better: filter by actual week dates, but this requires per-week therapist data
+        # For now, use the all-time merged therapist list for all periods
+        if loc_filter:
+            return sorted([t for t in all_therapists if t["loc"] in loc_filter], key=lambda x: -x["total"])[:n]
+        return sorted([t for t in all_therapists if t["loc"] not in ("MKT", "Testing")], key=lambda x: -x["total"])[:n]
+
+    this_year = [w for w in gs_weekly if w.get("end_date") and w["end_date"].year == today.year]
+    last_year = [w for w in gs_weekly if w.get("end_date") and w["end_date"].year == today.year - 1]
+    this_month = [w for w in gs_weekly if w.get("end_date") and w["end_date"].year == today.year and w["end_date"].month == today.month]
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+    this_week = [w for w in gs_weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= week_end and w["end_date"] >= week_start]
+    today_data = [w for w in gs_weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= today <= w["end_date"]]
+    lm = (date(today.year, today.month, 1) - timedelta(days=1))
+    last_month = [w for w in gs_weekly if w.get("end_date") and w["end_date"].year == lm.year and w["end_date"].month == lm.month]
+    prev_ytd_end = date(today.year - 1, today.month, today.day)
+    prev_ytd = [w for w in gs_weekly if w.get("end_date") and w["end_date"].year == today.year - 1 and w["end_date"] <= prev_ytd_end]
+    prev_ly = [w for w in gs_weekly if w.get("end_date") and w["end_date"].year == today.year - 2]
+
+    # Build per-period therapist lists from DB + GS combined data
+    # We need to rebuild these from the per-week DB entries
+    def therapists_for_period(period_weeks, all_db_therapists, gs_period_key, loc_filter=None):
+        """Combine GS period therapists with DB therapists for matching weeks."""
+        gs_list = rental.get(gs_period_key, [])
+        period_week_keys = {w["week"] for w in period_weeks}
+
+        # Filter DB therapists to only those whose weeks overlap this period
+        db_week_therapists = defaultdict(float)
+        for dbt in db_therapists:
+            # DB therapists are all-time totals; we need per-period
+            # For now, if any DB week falls in this period, include the therapist
+            pass
+
+        # Simple approach: use GS period therapists + all DB therapists (since DB has all-time)
+        # This is imperfect but workable until full per-week DB therapist tracking
+        merged = {}
+        for t in gs_list:
+            key = (t["name"], t["loc"])
+            merged[key] = {**t}
+
+        # Add DB therapists proportionally (scale by period weeks / total weeks)
+        total_db_weeks = len(db_weekly) if db_weekly else 1
+        period_db_weeks = len([w for w in db_weekly if w["week"] in period_week_keys])
+        ratio = period_db_weeks / total_db_weeks if total_db_weeks > 0 else 0
+
+        for dbt in all_db_therapists:
+            if loc_filter and dbt["loc"] not in loc_filter:
+                continue
+            if loc_filter is None and dbt["loc"] in ("MKT", "Testing"):
+                continue
+            key = (dbt["name"], dbt["loc"])
+            scaled = int(dbt["total"] * ratio)
+            if scaled <= 0:
+                continue
+            if key in merged:
+                merged[key]["total"] += scaled
+            else:
+                merged[key] = {**dbt, "total": scaled}
+
+        return sorted(list(merged.values()), key=lambda x: -x["total"])[:60]
+
+    return {
+        "weekly": weekly_clean,
+        "weekly52": weekly_52,
+        "monthly": rental_monthly,
+        "yearly": rental_yearly,
+        "therapists": therapists_all,
+        "mktTherapists": mkt_all,
+        "testTherapists": test_all,
+        "allTime": period_summary(gs_weekly),
+        "ytd": period_summary(this_year),
+        "lastYear": period_summary(last_year),
+        "thisMonth": period_summary(this_month),
+        "thisWeek": period_summary(this_week),
+        "today": period_summary(today_data),
+        "lastMonth": period_summary(last_month),
+        "prevYtd": period_summary(prev_ytd),
+        "prevLy": period_summary(prev_ly),
+        "ytdTherapists": therapists_for_period(this_year, db_therapists, "ytdTherapists"),
+        "lyTherapists": therapists_for_period(last_year, db_therapists, "lyTherapists"),
+        "thisMonthTherapists": therapists_for_period(this_month, db_therapists, "thisMonthTherapists"),
+        "thisWeekTherapists": therapists_for_period(this_week, db_therapists, "thisWeekTherapists"),
+        "todayTherapists": therapists_for_period(today_data, db_therapists, "todayTherapists"),
+        "lastMonthTherapists": therapists_for_period(last_month, db_therapists, "lastMonthTherapists"),
+        "mktYtdTherapists": therapists_for_period(this_year, db_therapists, "mktYtdTherapists", loc_filter=["MKT"]),
+        "mktLyTherapists": therapists_for_period(last_year, db_therapists, "mktLyTherapists", loc_filter=["MKT"]),
+        "mktThisMonthTherapists": therapists_for_period(this_month, db_therapists, "mktThisMonthTherapists", loc_filter=["MKT"]),
+        "mktThisWeekTherapists": therapists_for_period(this_week, db_therapists, "mktThisWeekTherapists", loc_filter=["MKT"]),
+        "testYtdTherapists": therapists_for_period(this_year, db_therapists, "testYtdTherapists", loc_filter=["Testing"]),
+        "testLyTherapists": therapists_for_period(last_year, db_therapists, "testLyTherapists", loc_filter=["Testing"]),
+        "testThisMonthTherapists": therapists_for_period(this_month, db_therapists, "testThisMonthTherapists", loc_filter=["Testing"]),
+        "testThisWeekTherapists": therapists_for_period(this_week, db_therapists, "testThisWeekTherapists", loc_filter=["Testing"]),
+    }
+
+
 def generate_data() -> dict:
     """Fetch both CSVs and return the complete dashboard data dict."""
     today = date.today()
@@ -751,6 +1034,13 @@ def generate_data() -> dict:
     }
 
     rental = process_rental(rental_rows)
+
+    # ── Merge DB rental entries into Google Sheet rental data ──
+    db_rental_weekly, db_rental_therapists = convert_db_rental()
+    if db_rental_weekly:
+        rental = merge_rental_data(rental, db_rental_weekly, db_rental_therapists)
+        logger.info("Merged DB rental data into dashboard")
+
     data["_rental"] = rental
     data["_cashflow"] = build_cashflow(all_leads, rental.get("weekly", []))
     data["_generated"] = datetime.now().isoformat()
