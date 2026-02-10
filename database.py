@@ -307,6 +307,14 @@ def get_rental_weeks():
         return [{"week_start": r["week_start"], "week_end": r["week_end"]} for r in rows]
 
 
+def get_all_rental_entries():
+    """Get ALL rental entries for dashboard merging."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM rental_entries ORDER BY week_start ASC, therapist"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
 def delete_rental_week(week_start, week_end):
     """Delete all entries for a specific week."""
     with get_db() as conn:
