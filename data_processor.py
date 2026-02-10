@@ -1063,5 +1063,24 @@ def generate_data() -> dict:
     data["_cashflow"] = build_cashflow(all_leads, rental.get("weekly", []))
     data["_generated"] = datetime.now().isoformat()
 
+    # ── Day-of-week 4-week average ──
+    four_wk_start = week_start - timedelta(days=28)
+    four_wk_leads = [l for l in all_leads if four_wk_start <= l["date"] < week_start]
+    dow_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    dow_leads = defaultdict(int)
+    dow_booked = defaultdict(int)
+    for l in four_wk_leads:
+        d = l["date"].weekday()
+        dow_leads[d] += 1
+        if l["booked"]:
+            dow_booked[d] += 1
+    dow_avg = []
+    for i, name in enumerate(dow_names):
+        avg_l = round(dow_leads[i] / 4, 1)
+        avg_b = round(dow_booked[i] / 4, 1)
+        dow_avg.append({"day": name, "leads": avg_l, "booked": avg_b})
+    dow_avg.sort(key=lambda x: x["leads"], reverse=True)
+    data["_dayOfWeekAvg"] = dow_avg
+
     logger.info("Data generation complete — %d bytes JSON", len(json.dumps(data)))
     return data
