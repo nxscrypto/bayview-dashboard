@@ -650,6 +650,9 @@ def process_rental(rows):
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     this_week = [w for w in weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= week_end and w["end_date"] >= week_start]
+    last_week_start = week_start - timedelta(days=7)
+    last_week_end = week_start - timedelta(days=1)
+    last_week = [w for w in weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= last_week_end and w["end_date"] >= last_week_start]
     today_data = [w for w in weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= today <= w["end_date"]]
 
     lm = (date(today.year, today.month, 1) - timedelta(days=1))
@@ -668,6 +671,7 @@ def process_rental(rows):
         "lastYear": period_summary(last_year),
         "thisMonth": period_summary(this_month),
         "thisWeek": period_summary(this_week),
+        "lastWeek": period_summary(last_week),
         "today": period_summary(today_data),
         "lastMonth": period_summary(last_month),
         "prevYtd": period_summary(prev_ytd),
@@ -676,16 +680,19 @@ def process_rental(rows):
         "lyTherapists": period_therapists(last_year),
         "thisMonthTherapists": period_therapists(this_month),
         "thisWeekTherapists": period_therapists(this_week),
+        "lastWeekTherapists": period_therapists(last_week),
         "todayTherapists": period_therapists(today_data),
         "lastMonthTherapists": period_therapists(last_month),
         "mktYtdTherapists": period_therapists(this_year, loc_filter=["MKT"]),
         "mktLyTherapists": period_therapists(last_year, loc_filter=["MKT"]),
         "mktThisMonthTherapists": period_therapists(this_month, loc_filter=["MKT"]),
         "mktThisWeekTherapists": period_therapists(this_week, loc_filter=["MKT"]),
+        "mktLastWeekTherapists": period_therapists(last_week, loc_filter=["MKT"]),
         "testYtdTherapists": period_therapists(this_year, loc_filter=["Testing"]),
         "testLyTherapists": period_therapists(last_year, loc_filter=["Testing"]),
         "testThisMonthTherapists": period_therapists(this_month, loc_filter=["Testing"]),
         "testThisWeekTherapists": period_therapists(this_week, loc_filter=["Testing"]),
+        "testLastWeekTherapists": period_therapists(last_week, loc_filter=["Testing"]),
     }
 
 
@@ -888,6 +895,9 @@ def merge_rental_data(rental, db_weekly, db_therapists):
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     this_week = [w for w in gs_weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= week_end and w["end_date"] >= week_start]
+    last_week_start = week_start - timedelta(days=7)
+    last_week_end = week_start - timedelta(days=1)
+    last_week = [w for w in gs_weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= last_week_end and w["end_date"] >= last_week_start]
     today_data = [w for w in gs_weekly if w.get("start_date") and w.get("end_date") and w["start_date"] <= today <= w["end_date"]]
     lm = (date(today.year, today.month, 1) - timedelta(days=1))
     last_month = [w for w in gs_weekly if w.get("end_date") and w["end_date"].year == lm.year and w["end_date"].month == lm.month]
@@ -950,6 +960,7 @@ def merge_rental_data(rental, db_weekly, db_therapists):
         "lastYear": period_summary(last_year),
         "thisMonth": period_summary(this_month),
         "thisWeek": period_summary(this_week),
+        "lastWeek": period_summary(last_week),
         "today": period_summary(today_data),
         "lastMonth": period_summary(last_month),
         "prevYtd": period_summary(prev_ytd),
@@ -958,16 +969,19 @@ def merge_rental_data(rental, db_weekly, db_therapists):
         "lyTherapists": therapists_for_period(last_year, db_therapists, "lyTherapists"),
         "thisMonthTherapists": therapists_for_period(this_month, db_therapists, "thisMonthTherapists"),
         "thisWeekTherapists": therapists_for_period(this_week, db_therapists, "thisWeekTherapists"),
+        "lastWeekTherapists": therapists_for_period(last_week, db_therapists, "lastWeekTherapists"),
         "todayTherapists": therapists_for_period(today_data, db_therapists, "todayTherapists"),
         "lastMonthTherapists": therapists_for_period(last_month, db_therapists, "lastMonthTherapists"),
         "mktYtdTherapists": therapists_for_period(this_year, db_therapists, "mktYtdTherapists", loc_filter=["MKT"]),
         "mktLyTherapists": therapists_for_period(last_year, db_therapists, "mktLyTherapists", loc_filter=["MKT"]),
         "mktThisMonthTherapists": therapists_for_period(this_month, db_therapists, "mktThisMonthTherapists", loc_filter=["MKT"]),
         "mktThisWeekTherapists": therapists_for_period(this_week, db_therapists, "mktThisWeekTherapists", loc_filter=["MKT"]),
+        "mktLastWeekTherapists": therapists_for_period(last_week, db_therapists, "mktLastWeekTherapists", loc_filter=["MKT"]),
         "testYtdTherapists": therapists_for_period(this_year, db_therapists, "testYtdTherapists", loc_filter=["Testing"]),
         "testLyTherapists": therapists_for_period(last_year, db_therapists, "testLyTherapists", loc_filter=["Testing"]),
         "testThisMonthTherapists": therapists_for_period(this_month, db_therapists, "testThisMonthTherapists", loc_filter=["Testing"]),
         "testThisWeekTherapists": therapists_for_period(this_week, db_therapists, "testThisWeekTherapists", loc_filter=["Testing"]),
+        "testLastWeekTherapists": therapists_for_period(last_week, db_therapists, "testLastWeekTherapists", loc_filter=["Testing"]),
     }
 
 
@@ -990,6 +1004,8 @@ def generate_data() -> dict:
     prev_month_end = month_start - timedelta(days=1)
     prev_week_start = week_start - timedelta(days=7)
     prev_week_end = week_start - timedelta(days=1)
+    prev_prev_wk_start = week_start - timedelta(days=14)
+    prev_prev_wk_end = week_start - timedelta(days=8)
     yesterday = today - timedelta(days=1)
 
     prev_ly_start = date(today.year - 2, 1, 1)
@@ -1021,6 +1037,7 @@ def generate_data() -> dict:
     prev_ly   = [l for l in all_leads if prev_ly_start <= l["date"] <= prev_ly_end]
     prev_mo   = [l for l in all_leads if prev_month_start <= l["date"] <= prev_month_end]
     prev_wk   = [l for l in all_leads if prev_week_start <= l["date"] <= prev_week_end]
+    prev_prev_wk = [l for l in all_leads if prev_prev_wk_start <= l["date"] <= prev_prev_wk_end]
     yest      = [l for l in all_leads if l["date"] == yesterday]
 
     data = {
@@ -1029,6 +1046,7 @@ def generate_data() -> dict:
         "lastyear":  build_period(lastyear, prev_ly),
         "month":     build_period(month, prev_mo),
         "week":      build_period(week, prev_wk),
+        "lastweek":  build_period(prev_wk, prev_prev_wk),
         "today":     build_period(tod, yest),
         "_monthlyRevenue": build_monthly_revenue(all_leads),
     }
