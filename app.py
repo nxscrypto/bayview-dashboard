@@ -152,6 +152,11 @@ def api_status():
     return jsonify({"status": "ok", "loaded": _data_json is not None})
 
 
+@app.route("/healthz")
+def healthz():
+    return "ok", 200
+
+
 # -- Lead API ------------------------------------------------------------------
 @app.route("/api/leads", methods=["POST"])
 def api_add_lead():
