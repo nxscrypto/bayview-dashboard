@@ -19,14 +19,14 @@ logger = logging.getLogger("bayview")
 
 app = Flask(__name__, static_folder="static")
 
-# ── Database ─────────────────────────────────────────────────────────────────
+# -- Database ------------------------------------------------------------------
 from database import init_db, add_lead, update_lead, get_pending_leads, get_recent_leads, get_lead, delete_lead
 from database import init_rental_db, add_rental_entry, add_rental_entries_bulk, update_rental_entry, delete_rental_entry, get_rental_entry, get_rental_entries_by_week, get_recent_rental_entries, get_rental_weeks, delete_rental_week
 from calendar_sync import get_sessions_data
 init_db()
 init_rental_db()
 
-# ── State ────────────────────────────────────────────────────────────────────
+# -- State ---------------------------------------------------------------------
 _lock = threading.Lock()
 _data_json = None
 _data_dict = None
@@ -36,7 +36,7 @@ _loading = False
 REFRESH_MINUTES = int(os.environ.get("REFRESH_MINUTES", "15"))
 
 
-# ── Redis helpers ──────────────────────────────────────────────────────────────
+# -- Redis helpers -------------------------------------------------------------
 def _get_redis():
     url = os.environ.get("REDIS_URL")
     if not url:
@@ -77,7 +77,7 @@ def _load_redis():
     return None, None
 
 
-# ── Data loading ─────────────────────────────────────────────────────────────
+# -- Data loading --------------------------------------------------------------
 def _do_refresh():
     global _data_json, _data_dict, _last_refresh, _loading
     logger.info("Fetching data from Google Sheets...")
@@ -91,7 +91,7 @@ def _do_refresh():
             _last_refresh = datetime.now()
             _loading = False
         _save_redis(js)
-        logger.info("Data ready — %d bytes, %s leads",
+        logger.info("Data ready -- %d bytes, %s leads",
                      len(js), data.get("all", {}).get("total", "?"))
     except Exception:
         logger.exception("Refresh failed")
@@ -120,7 +120,7 @@ def _ensure_loaded():
     threading.Thread(target=_do_refresh, daemon=True).start()
 
 
-# ── Routes ───────────────────────────────────────────────────────────────────
+# -- Routes --------------------------------------------------------------------
 @app.route("/")
 def index():
     _ensure_loaded()
@@ -152,7 +152,7 @@ def api_status():
     return jsonify({"status": "ok", "loaded": _data_json is not None})
 
 
-# ── Lead API ─────────────────────────────────────────────────────────────────
+# -- Lead API ------------------------------------------------------------------
 @app.route("/api/leads", methods=["POST"])
 def api_add_lead():
     data = request.get_json()
@@ -212,7 +212,7 @@ def api_delete_lead(lead_id):
     return jsonify({"ok": True, "deleted": lead_id})
 
 
-# ── Rental API ───────────────────────────────────────────────────────────────
+# -- Rental API ----------------------------------------------------------------
 @app.route("/api/rental", methods=["POST"])
 def api_add_rental():
     data = request.get_json()
@@ -306,7 +306,7 @@ def api_delete_rental_week():
     return jsonify({"ok": True})
 
 
-# ── Sessions API ─────────────────────────────────────────────────────────────
+# -- Sessions API --------------------------------------------------------------
 @app.route("/api/sessions")
 def api_sessions():
     weeks_back = request.args.get("weeks", 8, type=int)
@@ -320,7 +320,7 @@ def api_sessions():
         return jsonify({"error": str(e)}), 500
 
 
-# ── FRCF API ─────────────────────────────────────────────────────────────────
+# -- FRCF API ------------------------------------------------------------------
 FRCF_CSV_URL = (
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vRaOPkOTxPGxGuGD5mXB3y5OvgqMalN0aezN-4FXTJKoBp-L_jCBOT6ELf1F66xKDQZ_P3-UYL9gELc"
@@ -354,7 +354,7 @@ def api_frcf():
         return jsonify({"error": str(e)}), 500
 
 
-# ── Startup ──────────────────────────────────────────────────────────────────
+# -- Startup -------------------------------------------------------------------
 port = int(os.environ.get("PORT", 8080))
 logger.info("Starting on port %d", port)
 
