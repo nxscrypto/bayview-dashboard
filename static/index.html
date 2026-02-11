@@ -515,6 +515,7 @@ function BayviewDashboard() {
   const filterBtns = [
     { id: "ytd", label: "Year-to-Date" },
     { id: "month", label: "This Month" },
+    { id: "lastmonth", label: "Last Month" },
     { id: "week", label: "This Week" },
     { id: "lastweek", label: "Last Week" },
     { id: "today", label: "Today" },
@@ -582,7 +583,7 @@ function BayviewDashboard() {
           return map;
         };
 
-        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists", lastweek: "lastWeekTherapists" };
+        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", lastmonth: "lastMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists", lastweek: "lastWeekTherapists" };
         const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists", lastweek: "mktLastWeekTherapists" };
         const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists", lastweek: "testLastWeekTherapists" };
 
@@ -643,11 +644,14 @@ function BayviewDashboard() {
     const ls = new Date(mon); ls.setDate(mon.getDate() - 1);
     const ms = new Date(now.getFullYear(), now.getMonth(), 1);
     const ys = new Date(now.getFullYear(), 0, 1);
+    const lms = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lme = new Date(now.getFullYear(), now.getMonth(), 0);
     return {
       all: "All Data \u00b7 May 1, 2017 \u2013 " + fmtFull(now),
       ytd: "Year-to-Date \u00b7 " + fmt(ys) + " \u2013 " + fmtFull(now),
       lastyear: "Last Year \u00b7 Jan 1, " + (now.getFullYear()-1) + " \u2013 Dec 31, " + (now.getFullYear()-1),
       month: "This Month \u00b7 " + fmt(ms) + " \u2013 " + fmtFull(now),
+      lastmonth: "Last Month \u00b7 " + fmt(lms) + " \u2013 " + fmtFull(lme),
       week: "This Week \u00b7 " + fmt(mon) + " \u2013 " + fmtFull(sun),
       lastweek: "Last Week \u00b7 " + fmt(lm) + " \u2013 " + fmtFull(ls),
       today: "Today \u00b7 " + fmtFull(now),
@@ -750,7 +754,7 @@ return (
           {/* ═══ OVERVIEW TAB ═══ */}
           {activeTab === "overview" && (
             <>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(5, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(5, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
               <StatCard label="Total Leads" value={stats.total} icon="📊" color={C.blue} sub={`${stats.daily.length} active days`} prev={prev?.total} prevLabel={prevLabel} />
               <StatCard label="Booked" value={stats.booked} icon="✓" color={C.accent} sub={`${stats.bookingRate}% conversion`} prev={prev?.booked} prevLabel={prevLabel} />
               <StatCard label="Top Location" value={stats.topLocation.name} icon="📍" color={C.warm} sub={`${stats.topLocation.count.toLocaleString()} leads`} />
@@ -965,7 +969,7 @@ return (
 
             return (
             <>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
               <StatCard label="Top Performer" value={stats.team[0]?.name || "—"} icon="🏆" color="#FFD700" sub={`${stats.team[0]?.leads || 0} leads received`} />
               <StatCard label="Best Conversion" value={(stats.team.filter(t => t.leads >= 5).sort((a, b) => b.rate - a.rate)[0])?.name || "—"} icon="🎯" color={C.accent} sub={`${(stats.team.filter(t => t.leads >= 5).sort((a, b) => b.rate - a.rate)[0])?.rate || 0}% booking rate`} />
               <StatCard label="Needs Attention" value={concerns[0]?.name || "—"} icon="⚠️" color={C.rose} sub={concerns[0] ? `${concerns[0].leads} leads · ${concerns[0].rate}% conversion` : "All good"} />
@@ -1544,14 +1548,63 @@ return (
                                           {activeTab === "frcf" && (
             <div className="animate-in">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", marginBottom: 24, flexWrap: isMobile ? "wrap" : "nowrap", gap: 12 }}>
-                        <h2 style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, color: C.text }}>First Responder Children's Foundation Dashboard</h2>
-                <button onClick={() => { setFrcfLoading(true); fetch("/api/frcf").then(r=>r.json()).then(d=>{setFrcfData(d);setFrcfLoading(false);}).catch(()=>setFrcfLoading(false)); }} style={{padding:"8px 16px", background: C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer", fontSize:13}}>Refresh</button>
+                        <div>
+                          <h2 style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, color: C.text }}>First Responder Children's Foundation Dashboard</h2>
+                          <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>Showing: {dateLabels[timeFilter] || "All Data"}</p>
+                        </div>
+                <button onClick={() => { setFrcfLoading(true); fetch("/api/frcf").then(r=>r.json()).then(d=>{setFrcfData(d);setFrcfLoading(false);}).catch(()=>setFrcfLoading(false)); }} style={{padding:"8px 16px", background: C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer", fontSize:13, flexShrink:0}}>Refresh</button>
               </div>
 
   {frcfLoading && <div style={{ textAlign: "center", padding: 40, color: C.muted }}>Loading FRCF data...</div>}
 
               {!frcfLoading && frcfData && (() => {
-                    const sessions = frcfData.sessions || [];
+                    const allSessions = frcfData.sessions || [];
+
+                // Filter sessions by selected time period
+                const sessions = (() => {
+                  if (timeFilter === "all") return allSessions;
+                  const now = new Date();
+                  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                  let start, end;
+                  if (timeFilter === "ytd") {
+                    start = new Date(now.getFullYear(), 0, 1);
+                    end = today;
+                  } else if (timeFilter === "month") {
+                    start = new Date(now.getFullYear(), now.getMonth(), 1);
+                    end = today;
+                  } else if (timeFilter === "lastmonth") {
+                    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    end = new Date(now.getFullYear(), now.getMonth(), 0);
+                  } else if (timeFilter === "week") {
+                    const dow = now.getDay();
+                    start = new Date(today); start.setDate(today.getDate() - ((dow + 6) % 7));
+                    end = new Date(start); end.setDate(start.getDate() + 6);
+                  } else if (timeFilter === "lastweek") {
+                    const dow = now.getDay();
+                    const mon = new Date(today); mon.setDate(today.getDate() - ((dow + 6) % 7));
+                    start = new Date(mon); start.setDate(mon.getDate() - 7);
+                    end = new Date(mon); end.setDate(mon.getDate() - 1);
+                  } else if (timeFilter === "today") {
+                    start = today;
+                    end = today;
+                  } else if (timeFilter === "lastyear") {
+                    start = new Date(now.getFullYear() - 1, 0, 1);
+                    end = new Date(now.getFullYear() - 1, 11, 31);
+                  } else {
+                    return allSessions;
+                  }
+                  return allSessions.filter(s => {
+                    if (!s.session_date) return false;
+                    const parts = s.session_date.includes("/")
+                      ? s.session_date.split("/").map(Number)
+                      : s.session_date.split("-").map(Number);
+                    const d = s.session_date.includes("/")
+                      ? new Date(parts[2], parts[0] - 1, parts[1])
+                      : new Date(parts[0], parts[1] - 1, parts[2]);
+                    return d >= start && d <= end;
+                  });
+                })();
+
                 const totalSessions = sessions.length;
 
                 // Sessions by location
@@ -1773,12 +1826,12 @@ return (
               return rows;
             })();
             const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth, thisWeek: R.thisWeek, lastWeek: R.lastWeek, today: R.today };
-            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", week: "thisWeek", today: "today", all: "allTime", lastyear: "lastYear", lastweek: "lastWeek" };
+            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", lastmonth: "lastMonth", week: "thisWeek", today: "today", all: "allTime", lastyear: "lastYear", lastweek: "lastWeek" };
             const rentalPeriod = rentalPeriodMap[timeFilter] || "ytd";
           const rp = periods[rentalPeriod] || R.allTime || {};
-          const rpTherapists = rentalPeriod === "ytd" ? R.ytdTherapists : rentalPeriod === "lastYear" ? R.lyTherapists : rentalPeriod === "thisMonth" ? R.thisMonthTherapists : rentalPeriod === "lastWeek" ? R.lastWeekTherapists : R.therapists;
-          const prevPeriod = rentalPeriod === "ytd" ? R.prevYtd : rentalPeriod === "thisMonth" ? R.lastMonth : rentalPeriod === "lastYear" ? R.prevLy : rentalPeriod === "lastWeek" ? null : null;
-          const rpLabel = rentalPeriod === "ytd" ? "vs same period last year" : rentalPeriod === "thisMonth" ? "vs last month" : rentalPeriod === "lastYear" ? "vs prior year" : rentalPeriod === "lastWeek" ? "" : "";
+          const rpTherapists = rentalPeriod === "ytd" ? R.ytdTherapists : rentalPeriod === "lastYear" ? R.lyTherapists : rentalPeriod === "thisMonth" ? R.thisMonthTherapists : rentalPeriod === "lastMonth" ? R.lastMonthTherapists : rentalPeriod === "lastWeek" ? R.lastWeekTherapists : R.therapists;
+          const prevPeriod = rentalPeriod === "ytd" ? R.prevYtd : rentalPeriod === "thisMonth" ? R.lastMonth : rentalPeriod === "lastMonth" ? null : rentalPeriod === "lastYear" ? R.prevLy : rentalPeriod === "lastWeek" ? null : null;
+          const rpLabel = rentalPeriod === "ytd" ? "vs same period last year" : rentalPeriod === "thisMonth" ? "vs last month" : rentalPeriod === "lastMonth" ? "" : rentalPeriod === "lastYear" ? "vs prior year" : rentalPeriod === "lastWeek" ? "" : "";
 
           // Location pie data
           const locData = [
@@ -1799,7 +1852,7 @@ return (
           <>
 
             {/* KPIs */}
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(7, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(7, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
               <StatCard label="Total Revenue" value={fmtCurrency(rp.gt || 0)} icon="💰" color={C.accent} sub={`${rp.weeks || 0} weeks`} prev={prevPeriod?.gt} prevLabel={rpLabel} />
               <StatCard label="Fort Lauderdale" value={fmtCurrency(rp.ftl || 0)} icon="🏢" color={C.blue} sub={rp.gt ? `${Math.round((rp.ftl||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.ftl} prevLabel={rpLabel} />
               <StatCard label="Coral Springs" value={fmtCurrency(rp.cs || 0)} icon="🏢" color={C.warm} sub={rp.gt ? `${Math.round((rp.cs||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.cs} prevLabel={rpLabel} />

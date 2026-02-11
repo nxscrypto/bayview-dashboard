@@ -1008,6 +1008,15 @@ def generate_data() -> dict:
     prev_prev_wk_end = week_start - timedelta(days=8)
     yesterday = today - timedelta(days=1)
 
+    # Previous-previous month (for lastmonth comparison)
+    try:
+        prev_prev_month_start = date(
+            prev_month_start.year if prev_month_start.month > 1 else prev_month_start.year - 1,
+            prev_month_start.month - 1 if prev_month_start.month > 1 else 12, 1)
+    except Exception:
+        prev_prev_month_start = date(prev_month_start.year - 1, 12, 1)
+    prev_prev_month_end = prev_month_start - timedelta(days=1)
+
     prev_ly_start = date(today.year - 2, 1, 1)
     prev_ly_end = date(today.year - 2, 12, 31)
 
@@ -1038,6 +1047,7 @@ def generate_data() -> dict:
     prev_mo   = [l for l in all_leads if prev_month_start <= l["date"] <= prev_month_end]
     prev_wk   = [l for l in all_leads if prev_week_start <= l["date"] <= prev_week_end]
     prev_prev_wk = [l for l in all_leads if prev_prev_wk_start <= l["date"] <= prev_prev_wk_end]
+    prev_prev_mo = [l for l in all_leads if prev_prev_month_start <= l["date"] <= prev_prev_month_end]
     yest      = [l for l in all_leads if l["date"] == yesterday]
 
     data = {
@@ -1047,6 +1057,7 @@ def generate_data() -> dict:
         "month":     build_period(month, prev_mo),
         "week":      build_period(week, prev_wk),
         "lastweek":  build_period(prev_wk, prev_prev_wk),
+        "lastmonth": build_period(prev_mo, prev_prev_mo),
         "today":     build_period(tod, yest),
         "_monthlyRevenue": build_monthly_revenue(all_leads),
     }
