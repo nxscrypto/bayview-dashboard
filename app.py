@@ -370,12 +370,7 @@ def api_frcf():
     except Exception as e:
         logger.exception("FRCF data fetch failed")
         return jsonify({"error": str(e)}), 500
-```
 
-You'll also need to add these to your **requirements.txt**:
-```
-gspread
-google-auth
 
 # ── Startup ──────────────────────────────────────────────────────────────────
 port = int(os.environ.get("PORT", 8080))
