@@ -328,6 +328,54 @@ def api_sessions():
     except Exception as e:
         logger.exception("Sessions fetch failed")
         return jsonify({"error": str(e)}), 500
+# ── FRCF API ─────────────────────────────────────────────────────────────────
+@app.route("/api/frcf")
+def api_frcf():
+    """Fetch First Responder Children's Foundation session data from Google Sheets."""
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        creds_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+        if not creds_json:
+            return jsonify({"error": "Google service account not configured"}), 500
+
+        creds_dict = json.loads(creds_json)
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets.readonly",
+        ]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        gc = gspread.authorize(creds)
+
+        FRCF_SHEET_ID = "1TUhgr4l1YfiEjDcSVSlvydfAWx76xstTWZRWzDwKs_k"
+        sheet = gc.open_by_key(FRCF_SHEET_ID)
+        worksheet = sheet.worksheet("Form Responses 1")
+        rows = worksheet.get_all_records()
+
+        sessions = []
+        for row in rows:
+            sessions.append({
+                "timestamp": str(row.get("Timestamp", "")),
+                "session_date": str(row.get("Session Date", "")),
+                "location": str(row.get("Location", "")),
+                "client_id": str(row.get("Client ID #", "")),
+                "age": row.get("Age", ""),
+                "type_of_service": str(row.get("Type of Service", "")),
+                "presenting_problem": str(row.get("Presenting Problem", "")),
+                "therapist": str(row.get("Therapist", "")),
+            })
+
+        return jsonify({"sessions": sessions, "total": len(sessions)})
+
+    except Exception as e:
+        logger.exception("FRCF data fetch failed")
+        return jsonify({"error": str(e)}), 500
+```
+
+You'll also need to add these to your **requirements.txt**:
+```
+gspread
+google-auth
 
 # ── Startup ──────────────────────────────────────────────────────────────────
 port = int(os.environ.get("PORT", 8080))
