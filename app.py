@@ -22,9 +22,11 @@ app = Flask(__name__, static_folder="static")
 # -- Database ------------------------------------------------------------------
 from database import init_db, add_lead, update_lead, get_pending_leads, get_recent_leads, get_lead, delete_lead
 from database import init_rental_db, add_rental_entry, add_rental_entries_bulk, update_rental_entry, delete_rental_entry, get_rental_entry, get_rental_entries_by_week, get_recent_rental_entries, get_rental_weeks, delete_rental_week
+from database import init_cache_db, save_data_cache, load_data_cache
 from calendar_sync import get_sessions_data
 init_db()
 init_rental_db()
+init_cache_db()
 
 # -- State ---------------------------------------------------------------------
 _lock = threading.Lock()
@@ -91,6 +93,7 @@ def _do_refresh():
             _last_refresh = datetime.now()
             _loading = False
         _save_redis(js)
+        save_data_cache(js)
         logger.info("Data ready -- %d bytes, %s leads",
                      len(js), data.get("all", {}).get("total", "?"))
     except Exception:
@@ -106,6 +109,7 @@ def _ensure_loaded():
             return
         _loading = True
 
+    # Try Redis first
     cached, ts = _load_redis()
     if cached:
         with _lock:
@@ -117,6 +121,19 @@ def _ensure_loaded():
         threading.Thread(target=_do_refresh, daemon=True).start()
         return
 
+    # Fall back to SQLite cache
+    cached, ts = load_data_cache()
+    if cached:
+        with _lock:
+            _data_json = cached
+            _data_dict = json.loads(cached)
+            _last_refresh = datetime.fromisoformat(ts) if ts else datetime.now()
+            _loading = False
+        logger.info("Serving from SQLite cache (last updated: %s)", ts)
+        threading.Thread(target=_do_refresh, daemon=True).start()
+        return
+
+    # No cache — fetch from Google Sheets
     threading.Thread(target=_do_refresh, daemon=True).start()
 
 
@@ -150,6 +167,11 @@ def api_refresh():
 @app.route("/api/status")
 def api_status():
     return jsonify({"status": "ok", "loaded": _data_json is not None})
+
+
+@app.route("/healthz")
+def healthz():
+    return "ok", 200
 
 
 # -- Lead API ------------------------------------------------------------------

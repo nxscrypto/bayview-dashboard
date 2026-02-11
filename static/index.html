@@ -48,12 +48,23 @@
 
   <script type="text/babel" data-type="module">
     // ─── Globals from CDN ───
-    const { useState, useMemo, useEffect, useCallback } = React;
+    const { useState, useMemo, useEffect, useCallback, useRef } = React;
     const {
       BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
       PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
       AreaChart, Area, ComposedChart
     } = Recharts;
+
+    // ─── Mobile detection hook ───
+    const useIsMobile = (breakpoint = 768) => {
+      const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint);
+      useEffect(() => {
+        const handler = () => setIsMobile(window.innerWidth < breakpoint);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+      }, [breakpoint]);
+      return isMobile;
+    };
 
     // ─── Data will be loaded from API ───
     let PRECOMPUTED = null;
@@ -143,6 +154,7 @@ const RankRow = ({ rank, name, count, max, color, booked, rate, cost, revenue })
 );
 
 function BayviewDashboard() {
+  const isMobile = useIsMobile();
   const [timeFilter, setTimeFilter] = useState("month");
 
         // Lead Intake state
@@ -681,56 +693,64 @@ return (
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: ${C.bg}; } ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 3px; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         .animate-in { animation: fadeIn 0.4s ease forwards; }
+        @media (max-width: 767px) {
+          input, select, textarea { font-size: 16px !important; }
+          table { font-size: 11px !important; }
+          table th, table td { padding: 6px 4px !important; }
+          .recharts-legend-wrapper { font-size: 10px !important; }
+        }
       `}</style>
 
       {/* ─── HEADER ─── */}
-      <div style={{ borderBottom: `1px solid ${C.border}`, padding: "18px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", background: `linear-gradient(180deg, ${C.card} 0%, ${C.bg} 100%)`, flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: C.bg }}>B</div>
+      <div style={{ borderBottom: `1px solid ${C.border}`, padding: isMobile ? "14px 12px" : "18px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", background: `linear-gradient(180deg, ${C.card} 0%, ${C.bg} 100%)`, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14 }}>
+          <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: 10, background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 15 : 18, fontWeight: 700, color: C.bg, flexShrink: 0 }}>B</div>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: -0.5 }}>Bayview Lead Intelligence</h1>
-            <p style={{ fontSize: 11, color: C.textMuted, margin: 0 }}>Real-time intake analytics across all locations</p>
+            <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, margin: 0, letterSpacing: -0.5 }}>Bayview Lead Intelligence</h1>
+            {!isMobile && <p style={{ fontSize: 11, color: C.textMuted, margin: 0 }}>Real-time intake analytics across all locations</p>}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", ...(isMobile ? { width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch", flexWrap: "nowrap", paddingBottom: 4 } : {}) }}>
           {filterBtns.map(f => (
             <button key={f.id} onClick={() => setTimeFilter(f.id)} style={{
-              padding: "6px 14px", borderRadius: 8,
+              padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 8,
               border: `1px solid ${timeFilter === f.id ? C.accent + "50" : C.border}`,
               background: timeFilter === f.id ? C.accentGlow : "transparent",
               color: timeFilter === f.id ? C.accent : C.textMuted,
-              fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s",
+              fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s",
+              whiteSpace: "nowrap", flexShrink: 0,
             }}>{f.label}</button>
           ))}
         </div>
       </div>
 
       {/* ─── DATE RANGE BANNER ─── */}
-      <div style={{ padding: "8px 28px", background: C.accentGlow, borderBottom: `1px solid ${C.accent}20`, display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ padding: isMobile ? "8px 12px" : "8px 28px", background: C.accentGlow, borderBottom: `1px solid ${C.accent}20`, display: "flex", alignItems: "center", gap: 8, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <span style={{ fontSize: 11, color: C.accent, fontWeight: 600 }}>📅</span>
-        <span style={{ fontSize: 12, color: C.accent, fontWeight: 600, letterSpacing: 0.2 }}>{dateLabels[timeFilter]}</span>
-        <span style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>{stats.total.toLocaleString()} leads in this period</span>
+        <span style={{ fontSize: isMobile ? 11 : 12, color: C.accent, fontWeight: 600, letterSpacing: 0.2 }}>{dateLabels[timeFilter]}</span>
+        <span style={{ fontSize: 11, color: C.textMuted, marginLeft: isMobile ? 0 : "auto" }}>{stats.total.toLocaleString()} leads in this period</span>
       </div>
 
       {/* ─── NAV TABS ─── */}
-      <div style={{ padding: "0 28px", borderBottom: `1px solid ${C.border}`, display: "flex", gap: 0 }}>
+      <div style={{ padding: isMobile ? "0 8px" : "0 28px", borderBottom: `1px solid ${C.border}`, display: "flex", gap: 0, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: "12px 20px", border: "none",
+            padding: isMobile ? "10px 12px" : "12px 20px", border: "none",
             borderBottom: `2px solid ${activeTab === t.id ? C.accent : "transparent"}`,
             background: "transparent", color: activeTab === t.id ? C.text : C.textMuted,
-            fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s",
+            fontSize: isMobile ? 12 : 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s",
+            whiteSpace: "nowrap", flexShrink: 0,
           }}>{t.label}</button>
         ))}
       </div>
 
       {/* ─── CONTENT ─── */}
-      <div style={{ padding: "24px 28px", maxWidth: 1440, margin: "0 auto" }} className="animate-in" key={timeFilter + activeTab}>
+      <div style={{ padding: isMobile ? "16px 10px" : "24px 28px", maxWidth: 1440, margin: "0 auto" }} className="animate-in" key={timeFilter + activeTab}>
 
           {/* ═══ OVERVIEW TAB ═══ */}
           {activeTab === "overview" && (
             <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(5, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
               <StatCard label="Total Leads" value={stats.total} icon="📊" color={C.blue} sub={`${stats.daily.length} active days`} prev={prev?.total} prevLabel={prevLabel} />
               <StatCard label="Booked" value={stats.booked} icon="✓" color={C.accent} sub={`${stats.bookingRate}% conversion`} prev={prev?.booked} prevLabel={prevLabel} />
               <StatCard label="Top Location" value={stats.topLocation.name} icon="📍" color={C.warm} sub={`${stats.topLocation.count.toLocaleString()} leads`} />
@@ -738,7 +758,7 @@ return (
               <StatCard label="Top Service" value={stats.topService.name.replace(" Therapy", "")} icon="🩺" color={C.rose} sub={`${stats.topService.count.toLocaleString()} requests`} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 16, marginBottom: 16 }}>
               <ChartCard title={useMonthly ? "Monthly Lead Volume" : "Daily Lead Volume"} subtitle="Leads with booking overlay">
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={chartData}>
@@ -772,7 +792,7 @@ return (
               </ChartCard>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <ChartCard title="Leads by Day of Week" subtitle="4-week average — ranked highest to lowest">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={PRECOMPUTED._dayOfWeekAvg || []} layout="vertical" margin={{ left: 20, right: 20 }}>
@@ -800,7 +820,7 @@ return (
               </ChartCard>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <ChartCard title="Cumulative Leads vs Booked" subtitle="Running totals — gap = unconverted pipeline">
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={cumulative}>
@@ -867,7 +887,7 @@ return (
               </ChartCard>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
               <ChartCard title="Services Requested" subtitle="Types of therapy being sought">
                 <ResponsiveContainer width="100%" height={Math.max(250, stats.services.length * 30)}>
                   <BarChart data={stats.services} layout="vertical" margin={{ left: 10 }}>
@@ -945,14 +965,14 @@ return (
 
             return (
             <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
               <StatCard label="Top Performer" value={stats.team[0]?.name || "—"} icon="🏆" color="#FFD700" sub={`${stats.team[0]?.leads || 0} leads received`} />
               <StatCard label="Best Conversion" value={(stats.team.filter(t => t.leads >= 5).sort((a, b) => b.rate - a.rate)[0])?.name || "—"} icon="🎯" color={C.accent} sub={`${(stats.team.filter(t => t.leads >= 5).sort((a, b) => b.rate - a.rate)[0])?.rate || 0}% booking rate`} />
               <StatCard label="Needs Attention" value={concerns[0]?.name || "—"} icon="⚠️" color={C.rose} sub={concerns[0] ? `${concerns[0].leads} leads · ${concerns[0].rate}% conversion` : "All good"} />
               <StatCard label="Rising Star" value={upAndComers[0]?.name || "—"} icon="🚀" color={C.warm} sub={upAndComers[0] ? `+${upAndComers[0].rateChange}% vs all-time avg` : "No trending data"} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <ChartCard title="🏅 Team Lead Rankings" subtitle="Sorted by leads received — top 25">
                 <div style={{ maxHeight: 500, overflowY: "auto", paddingRight: 8 }}>
                   {stats.team.slice(0, 25).map((member, i) => (
@@ -1005,9 +1025,9 @@ return (
 
             {/* Marketing Intelligence */}
             <ChartCard title="📣 Marketing Intelligence" subtitle={`${mktMembers.length} on program · ${nonMktMembers.length} not enrolled — who\'s benefiting without paying?`} style={{ marginBottom: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginTop: 8 }}>
                 {/* Summary Stats */}
-                <div style={{ background: C.bg, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
+                <div style={{ background: C.bg, borderRadius: 10, padding: isMobile ? 12 : 16, border: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>🟢 Marketing Members</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div><div style={{ fontSize: 10, color: C.textDim }}>MEMBERS</div><div style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{mktMembers.length}</div></div>
@@ -1027,7 +1047,7 @@ return (
                   </div>
                 </div>
 
-                <div style={{ background: C.bg, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
+                <div style={{ background: C.bg, borderRadius: 10, padding: isMobile ? 12 : 16, border: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: C.warm, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>🟠 Not on Marketing</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div><div style={{ fontSize: 10, color: C.textDim }}>MEMBERS</div><div style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{nonMktMembers.length}</div></div>
@@ -1050,7 +1070,7 @@ return (
             </ChartCard>
 
             {/* Rising Stars & Conversion Concerns */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
               {/* Up & Comers */}
               <ChartCard title="🚀 Rising Stars" subtitle="Trending above their all-time avg this week">
                 <div style={{ maxHeight: 350, overflowY: "auto" }}>
@@ -1240,7 +1260,7 @@ return (
             <div>
               <ChartCard title="Weekly Room Rental Input" subtitle="Enter weekly rental amounts per therapist — supports room rental, marketing & testing amounts per entry">
                 {rentalMsg && <div style={{padding:"10px 16px", marginBottom:12, borderRadius:8, background: rentalMsg.type==="success" ? "#064E3B" : "#7F1D1D", color: rentalMsg.type==="success" ? C.accent : C.rose, fontSize:13}}>{rentalMsg.text}</div>}
-                <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16}}>
+                <div style={{display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:12, marginBottom:16}}>
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week Start (Monday) *</label><input type="date" value={rentalForm.week_start} onChange={e => setRentalForm({...rentalForm, week_start: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                   <div><label style={{fontSize:11, color:C.textMuted, display:"block", marginBottom:4}}>Week End (Sunday) *</label><input type="date" value={rentalForm.week_end} onChange={e => setRentalForm({...rentalForm, week_end: e.target.value})} style={{width:"100%", padding:"8px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
                 </div>
@@ -1248,8 +1268,8 @@ return (
                 {rentalSessionsLoading && <div style={{padding:'8px 12px', marginBottom:8, borderRadius:6, background:'#1E3A5F', color:'#60A5FA', fontSize:11}}>Loading session data...</div>}
                 <div style={{fontSize:12, fontWeight:700, color:C.textMuted, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5}}>Therapist Entries</div>
                 {rentalForm.entries.map((entry, idx) => (
-                  <div key={idx} style={{display:"grid", gridTemplateColumns:"2fr 1fr 0.8fr 1fr 1fr 1fr auto", gap:8, marginBottom:8, alignItems:"end"}}>
-                    <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Therapist</label><select value={entry.therapist} onChange={e => handleTherapistSelect(idx, e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select therapist...</option>{RENTAL_THERAPISTS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                  <div key={idx} style={{display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "2fr 1fr 0.8fr 1fr 1fr 1fr auto", gap:8, marginBottom: isMobile ? 16 : 8, alignItems:"end", ...(isMobile ? {padding: "12px 0", borderBottom: `1px solid ${C.border}`} : {})}}>
+                    <div style={isMobile ? {gridColumn: "1 / -1"} : {}}><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Therapist</label><select value={entry.therapist} onChange={e => handleTherapistSelect(idx, e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}><option value="">Select therapist...</option>{RENTAL_THERAPISTS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Location</label><select value={entry.location} onChange={e => updateRentalRow(idx, 'location', e.target.value)} style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}}>{RENTAL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:'block', marginBottom:2}}>Sessions</label><input type="number" value={entry.sessions} onChange={e => updateRentalRow(idx, 'sessions', e.target.value)} style={{width:'100%', padding:'6px 8px', background:C.card, border:'1px solid ' + C.border, borderRadius:6, color:'#4ADE80', fontSize:13, fontWeight:600}} placeholder="0" /></div>
                     <div><label style={{fontSize:10, color:C.textDim, display:"block", marginBottom:2}}>Room Rental ($)</label><input type="number" step="0.01" value={entry.amount_room} onChange={e => updateRentalRow(idx, 'amount_room', e.target.value)} placeholder="0.00" style={{width:"100%", padding:"7px 10px", background:"#1a1a2e", border:"1px solid #2a2a4a", borderRadius:6, color:C.text, fontSize:13}} /></div>
@@ -1374,8 +1394,8 @@ return (
 
           {activeTab === "sessions" && (
           <div className="animate-in">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>Weekly Session Counts by Therapist</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", marginBottom: 24, flexWrap: isMobile ? "wrap" : "nowrap", gap: 12 }}>
+              <h2 style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, color: C.text }}>Weekly Session Counts by Therapist</h2>
               <button onClick={() => {
                 setSessionsLoading(true);
                 fetch("/api/sessions?weeks=12")
@@ -1415,9 +1435,9 @@ return (
                   const locations = Object.keys(week.locations);
                   return (
                     <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 18, fontWeight: 600, color: C.text }}>Week of {week.week_label}</h3>
-                        <div style={{ background: C.accent, color: "#0B0E11", padding: "6px 16px", borderRadius: 20, fontWeight: 700, fontSize: 15 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", marginBottom: 16, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8 }}>
+                        <h3 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 600, color: C.text }}>Week of {week.week_label}</h3>
+                        <div style={{ background: C.accent, color: "#0B0E11", padding: "6px 16px", borderRadius: 20, fontWeight: 700, fontSize: isMobile ? 13 : 15, flexShrink: 0 }}>
                           Total: {week.grand_total} sessions
                         </div>
                       </div>
@@ -1523,8 +1543,8 @@ return (
 
                                           {activeTab === "frcf" && (
             <div className="animate-in">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                        <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>First Responder Children's Foundation Dashboard</h2>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", marginBottom: 24, flexWrap: isMobile ? "wrap" : "nowrap", gap: 12 }}>
+                        <h2 style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, color: C.text }}>First Responder Children's Foundation Dashboard</h2>
                 <button onClick={() => { setFrcfLoading(true); fetch("/api/frcf").then(r=>r.json()).then(d=>{setFrcfData(d);setFrcfLoading(false);}).catch(()=>setFrcfLoading(false)); }} style={{padding:"8px 16px", background: C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer", fontSize:13}}>Refresh</button>
               </div>
 
@@ -1590,7 +1610,7 @@ return (
 
                       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16 }}>
                           {/* Sessions by Therapist */}
-                        <ChartCard title="Total Sessions by Therapist" style={{ flex: 1, minWidth: 400 }}>
+                        <ChartCard title="Total Sessions by Therapist" style={{ flex: 1, minWidth: isMobile ? 0 : 400 }}>
                         <div style={{ overflowX: "auto" }}>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                             <thead>
@@ -1612,7 +1632,7 @@ return (
   </ChartCard>
 
     {/* Sessions by Client */}
-                      <ChartCard title="Total Sessions by Client" style={{ flex: 1, minWidth: 400 }}>
+                      <ChartCard title="Total Sessions by Client" style={{ flex: 1, minWidth: isMobile ? 0 : 400 }}>
                             <div style={{ overflowX: "auto" }}>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                             <thead>
@@ -1636,7 +1656,7 @@ return (
 
   {/* Services Section */}
                     <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16 }}>
-                      <ChartCard title="Types of Service" style={{ flex: 1, minWidth: 400 }}>
+                      <ChartCard title="Types of Service" style={{ flex: 1, minWidth: isMobile ? 0 : 400 }}>
                                             <ResponsiveContainer width="100%" height={300}>
                           <PieChart>
                               <Pie data={Object.entries(serviceCounts).map(([name, value]) => ({name, value}))} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({name, percent}) => `${name} ${(percent*100).toFixed(0)}%`}>
@@ -1647,7 +1667,7 @@ return (
   </ResponsiveContainer>
   </ChartCard>
 
-                      <ChartCard title="Presenting Problems" style={{ flex: 1, minWidth: 400 }}>
+                      <ChartCard title="Presenting Problems" style={{ flex: 1, minWidth: isMobile ? 0 : 400 }}>
                                        <div style={{ overflowX: "auto", maxHeight: 350 }}>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                             <thead>
@@ -1779,7 +1799,7 @@ return (
           <>
 
             {/* KPIs */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(7, 1fr)", gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 24 }}>
               <StatCard label="Total Revenue" value={fmtCurrency(rp.gt || 0)} icon="💰" color={C.accent} sub={`${rp.weeks || 0} weeks`} prev={prevPeriod?.gt} prevLabel={rpLabel} />
               <StatCard label="Fort Lauderdale" value={fmtCurrency(rp.ftl || 0)} icon="🏢" color={C.blue} sub={rp.gt ? `${Math.round((rp.ftl||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.ftl} prevLabel={rpLabel} />
               <StatCard label="Coral Springs" value={fmtCurrency(rp.cs || 0)} icon="🏢" color={C.warm} sub={rp.gt ? `${Math.round((rp.cs||0)/rp.gt*100)}% of total` : ""} prev={prevPeriod?.cs} prevLabel={rpLabel} />
@@ -1805,7 +1825,7 @@ return (
               </ResponsiveContainer>
             </ChartCard>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
               {/* Location Breakdown Pie */}
               <ChartCard title="Revenue by Location" subtitle="Distribution across offices">
                 <ResponsiveContainer width="100%" height={280}>
@@ -1903,9 +1923,9 @@ return (
       </div>
 
       {/* ─── FOOTER ─── */}
-      <div style={{ borderTop: `1px solid ${C.border}`, padding: "14px 28px", display: "flex", justifyContent: "space-between", fontSize: 11, color: C.textDim }}>
-        <span>Bayview Lead Intelligence Dashboard • Data synced from Google Forms intake</span>
-        <span>{stats.total.toLocaleString()} total leads • {stats.team.length} team members • {stats.locations.length} locations</span>
+      <div style={{ borderTop: `1px solid ${C.border}`, padding: isMobile ? "12px 12px" : "14px 28px", display: "flex", justifyContent: "space-between", fontSize: 11, color: C.textDim, flexWrap: isMobile ? "wrap" : "nowrap", gap: isMobile ? 4 : 0 }}>
+        <span>Bayview Lead Intelligence Dashboard</span>
+        <span>{stats.total.toLocaleString()} total leads • {stats.team.length} team members</span>
       </div>
     </div>
   );

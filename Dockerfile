@@ -12,4 +12,4 @@ ARG CACHEBUST=1
 
 ENV REFRESH_MINUTES=15
 
-CMD ["sh", "-c", "echo Starting gunicorn on port $PORT && exec gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --access-logfile -"]
+CMD ["sh", "-c", "echo Starting gunicorn on port $PORT && exec gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 4 --timeout 180 --access-logfile -"]

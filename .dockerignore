@@ -1,0 +1,6 @@
+.git
+__pycache__
+*.pyc
+*.db
+bayview-dashboard/
+README.md
