@@ -169,6 +169,10 @@ function BayviewDashboard() {
     // Rental Input state
     
 
+
+        // FRCF state
+      const [frcfData, setFrcfData] = useState(null);
+      const [frcfLoading, setFrcfLoading] = useState(false);
         // Auto-calculate Monday-Sunday week dates
         const getAutoWeekDates = () => {
           const today = new Date();
@@ -494,6 +498,7 @@ function BayviewDashboard() {
           { id: "intake", label: "Lead Intake" },
           { id: "rentalInput", label: "Room Rental Input" },
     { id: "sessions", label: "Sessions" },
+    { id: "frcf", label: "FRCF" },
   ];
   const filterBtns = [
     { id: "ytd", label: "Year-to-Date" },
@@ -654,6 +659,19 @@ function BayviewDashboard() {
       })
       .catch(e => { console.error("Sessions fetch error:", e); setSessionsLoading(false); });
   }, [activeTab]);
+
+                                         // FRCF data fetching
+        useEffect(() => {
+                if (activeTab !== "frcf") return;
+                setFrcfLoading(true);
+                fetch("/api/frcf")
+                  .then(r => r.json())
+                  .then(data => {
+                              setFrcfData(data);
+                              setFrcfLoading(false);
+                  })
+                       .catch(e => { console.error("FRCF fetch error:", e); setFrcfLoading(false); });
+        }, [activeTab]);
 
 return (
     <div style={{ fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif", background: C.bg, color: C.text, minHeight: "100vh", fontSize: 13 }}>
@@ -1502,6 +1520,193 @@ return (
             )}
           </div>
         )}
+
+                                          {activeTab === "frcf" && (
+            <div className="animate-in">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                        <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>First Responder Children's Foundation Dashboard</h2>
+                <button onClick={() => { setFrcfLoading(true); fetch("/api/frcf").then(r=>r.json()).then(d=>{setFrcfData(d);setFrcfLoading(false);}).catch(()=>setFrcfLoading(false)); }} style={{padding:"8px 16px", background: C.accent, color:"#0B0E11", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer", fontSize:13}}>Refresh</button>
+              </div>
+
+  {frcfLoading && <div style={{ textAlign: "center", padding: 40, color: C.muted }}>Loading FRCF data...</div>}
+
+              {!frcfLoading && frcfData && (() => {
+                    const sessions = frcfData.sessions || [];
+                const totalSessions = sessions.length;
+
+                // Sessions by location
+                  const locCounts = {};
+                sessions.forEach(s => { locCounts[s.location] = (locCounts[s.location] || 0) + 1; });
+
+                // Sessions by therapist
+                                                                                                                                                                                                                                       const therapistCounts = {};
+                sessions.forEach(s => { therapistCounts[s.therapist] = (therapistCounts[s.therapist] || 0) + 1; });
+                  const therapistRows = Object.entries(therapistCounts).sort((a,b) => b[1] - a[1]);
+
+                      // Sessions by service type
+                const serviceCounts = {};
+                  sessions.forEach(s => { serviceCounts[s.type_of_service] = (serviceCounts[s.type_of_service] || 0) + 1; });
+
+                // Sessions by presenting problem
+                const problemCounts = {};
+                sessions.forEach(s => { problemCounts[s.presenting_problem] = (problemCounts[s.presenting_problem] || 0) + 1; });
+                      const problemRows = Object.entries(problemCounts).sort((a,b) => b[1] - a[1]);
+
+                  // Sessions by client
+                            const clientCounts = {};
+                sessions.forEach(s => { clientCounts[s.client_id] = (clientCounts[s.client_id] || 0) + 1; });
+                  const clientRows = Object.entries(clientCounts).sort((a,b) => b[1] - a[1]);
+
+                const locColors = {"Fort Lauderdale, FL": "#3ECFB4", "Coral Springs, FL": "#5B8DEF", "Plantation, FL": "#9B72CF", "Telehealth": "#F0A050"};
+
+                return (
+                          <div>
+                                                                                                                                  {/* Summary Cards */}
+                            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+                      <div style={{ flex: 1, minWidth: 150, background: C.card, borderRadius: 12, padding: 20, textAlign: "center" }}>
+                          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>Total Sessions</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: C.accent }}>{totalSessions}</div>
+                      </div>
+    {Object.entries(locCounts).map(([loc, count]) => (
+                        <div key={loc} style={{ flex: 1, minWidth: 150, background: C.card, borderRadius: 12, padding: 20, textAlign: "center" }}>
+                          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>{loc}</div>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: locColors[loc] || C.text }}>{count}</div>
+  </div>
+                            ))}
+                </div>
+
+    {/* Sessions by Location Bar Chart */}
+                        <ChartCard title="Sessions by Location">
+                      <ResponsiveContainer width="100%" height={300}>
+                                          <BarChart data={Object.entries(locCounts).map(([loc, count]) => ({location: loc, sessions: count}))}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                          <XAxis dataKey="location" tick={{ fill: C.muted, fontSize: 11 }} />
+                          <YAxis tick={{ fill: C.muted, fontSize: 11 }} />
+                                                          <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8 }} />
+                          <Bar dataKey="sessions" fill={C.accent} radius={[4, 4, 0, 0]} />
+                                                                                                                                         </BarChart>
+  </ResponsiveContainer>
+                      </ChartCard>
+
+                      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16 }}>
+                          {/* Sessions by Therapist */}
+                        <ChartCard title="Total Sessions by Therapist" style={{ flex: 1, minWidth: 400 }}>
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                            <thead>
+                                  <tr style={{ borderBottom: "1px solid " + C.border }}>
+                                                <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Therapist</th>
+                                <th style={{ textAlign: "center", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Sessions</th>
+                                  </tr>
+  </thead>
+                            <tbody>
+                                                        {therapistRows.map(([name, count]) => (
+                                                                               <tr key={name} style={{ borderBottom: "1px solid " + C.border }}>
+                                                <td style={{ padding: "10px 12px", color: C.text }}>{name}</td>
+                                  <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent }}>{count}</td>
+          </tr>
+                              ))}
+          </tbody>
+  </table>
+  </div>
+  </ChartCard>
+
+    {/* Sessions by Client */}
+                      <ChartCard title="Total Sessions by Client" style={{ flex: 1, minWidth: 400 }}>
+                            <div style={{ overflowX: "auto" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                            <thead>
+                                          <tr style={{ borderBottom: "1px solid " + C.border }}>
+                                <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Client ID</th>
+                                <th style={{ textAlign: "center", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Sessions</th>
+                                          </tr>
+  </thead>
+                            <tbody>
+                                {clientRows.map(([id, count]) => (
+                                <tr key={id} style={{ borderBottom: "1px solid " + C.border }}>
+                                    <td style={{ padding: "10px 12px", color: C.text }}>{id}</td>
+                                  <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent }}>{count}</td>
+  </tr>
+                                      ))}
+                               </tbody>
+                                      </table>
+  </div>
+                      </ChartCard>
+  </div>
+
+  {/* Services Section */}
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 16 }}>
+                      <ChartCard title="Types of Service" style={{ flex: 1, minWidth: 400 }}>
+                                            <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                              <Pie data={Object.entries(serviceCounts).map(([name, value]) => ({name, value}))} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({name, percent}) => `${name} ${(percent*100).toFixed(0)}%`}>
+    {Object.entries(serviceCounts).map(([name], i) => <Cell key={name} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                                                </Pie>
+                                                             <Tooltip />
+                              </PieChart>
+  </ResponsiveContainer>
+  </ChartCard>
+
+                      <ChartCard title="Presenting Problems" style={{ flex: 1, minWidth: 400 }}>
+                                       <div style={{ overflowX: "auto", maxHeight: 350 }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                            <thead>
+                                        <tr style={{ borderBottom: "1px solid " + C.border }}>
+                                <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Problem</th>
+                                  <th style={{ textAlign: "center", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Count</th>
+                          </tr>
+                                                                                                                                  </thead>
+                              <tbody>
+                              {problemRows.map(([name, count]) => (
+                                  <tr key={name} style={{ borderBottom: "1px solid " + C.border }}>
+                                  <td style={{ padding: "10px 12px", color: C.text }}>{name}</td>
+                                  <td style={{ textAlign: "center", padding: "10px 12px", fontWeight: 700, color: C.accent }}>{count}</td>
+  </tr>
+                              ))}
+            </tbody>
+  </table>
+              </div>
+  </ChartCard>
+  </div>
+
+                    {/* Session Details Table */}
+                                      <ChartCard title="Session Details" style={{ marginTop: 16 }}>
+                        <div style={{ overflowX: "auto" }}>
+                                                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1px solid " + C.border }}>
+                              <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Date</th>
+                              <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Location</th>
+                                        <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Therapist</th>
+                                          <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Client ID</th>
+                              <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Service</th>
+                              <th style={{ textAlign: "left", padding: "10px 12px", color: C.muted, fontWeight: 600 }}>Presenting Problem</th>
+                            </tr>
+            </thead>
+                                    <tbody>
+                            {sessions.slice().sort((a,b) => new Date(b.session_date) - new Date(a.session_date)).map((s, i) => (
+                              <tr key={i} style={{ borderBottom: "1px solid " + C.border }}>
+                                    <td style={{ padding: "8px 12px", color: C.text }}>{s.session_date}</td>
+                                <td style={{ padding: "8px 12px", color: C.text }}>{s.location}</td>
+                                <td style={{ padding: "8px 12px", color: C.text }}>{s.therapist}</td>
+                                <td style={{ padding: "8px 12px", color: C.text }}>{s.client_id}</td>
+                                <td style={{ padding: "8px 12px", color: C.text }}>{s.type_of_service}</td>
+                                <td style={{ padding: "8px 12px", color: C.text }}>{s.presenting_problem}</td>
+  </tr>
+                            ))}
+    </tbody>
+  </table>
+  </div>
+                    </ChartCard>
+  </div>
+                );
+  })()}
+
+              {!frcfLoading && !frcfData && (
+                <div style={{ textAlign: "center", padding: 40, color: C.muted }}>No FRCF data available. Click Refresh to load.</div>
+              )}
+  </div>
+              )}
 
 
         {/* ═══ ROOM RENTAL TAB ═══ */}
