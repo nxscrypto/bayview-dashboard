@@ -323,3 +323,49 @@ def delete_rental_week(week_start, week_end):
             (week_start, week_end)
         )
     return True
+
+
+# ── Data Cache ────────────────────────────────────────────────────────────
+
+def init_cache_db():
+    """Create data_cache table for storing pre-computed dashboard JSON."""
+    _ensure_dir()
+    with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS data_cache (
+                key TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        logger.info("Data cache table initialized")
+
+
+def save_data_cache(json_str):
+    """Save computed dashboard data to SQLite cache."""
+    now = datetime.now().isoformat()
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO data_cache (key, data, updated_at) VALUES (?, ?, ?)",
+                ("dashboard", json_str, now)
+            )
+        logger.info("Saved %d bytes to SQLite cache", len(json_str))
+    except Exception as e:
+        logger.warning("SQLite cache save error: %s", e)
+
+
+def load_data_cache():
+    """Load cached dashboard data from SQLite. Returns (json_str, timestamp) or (None, None)."""
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT data, updated_at FROM data_cache WHERE key = ?",
+                ("dashboard",)
+            ).fetchone()
+            if row:
+                logger.info("Loaded %d bytes from SQLite cache", len(row["data"]))
+                return row["data"], row["updated_at"]
+    except Exception as e:
+        logger.warning("SQLite cache load error: %s", e)
+    return None, None
