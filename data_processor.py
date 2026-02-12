@@ -688,11 +688,13 @@ def process_rental(rows):
         "mktThisMonthTherapists": period_therapists(this_month, loc_filter=["MKT"]),
         "mktThisWeekTherapists": period_therapists(this_week, loc_filter=["MKT"]),
         "mktLastWeekTherapists": period_therapists(last_week, loc_filter=["MKT"]),
+        "mktLastMonthTherapists": period_therapists(last_month, loc_filter=["MKT"]),
         "testYtdTherapists": period_therapists(this_year, loc_filter=["Testing"]),
         "testLyTherapists": period_therapists(last_year, loc_filter=["Testing"]),
         "testThisMonthTherapists": period_therapists(this_month, loc_filter=["Testing"]),
         "testThisWeekTherapists": period_therapists(this_week, loc_filter=["Testing"]),
         "testLastWeekTherapists": period_therapists(last_week, loc_filter=["Testing"]),
+        "testLastMonthTherapists": period_therapists(last_month, loc_filter=["Testing"]),
     }
 
 
@@ -977,11 +979,13 @@ def merge_rental_data(rental, db_weekly, db_therapists):
         "mktThisMonthTherapists": therapists_for_period(this_month, db_therapists, "mktThisMonthTherapists", loc_filter=["MKT"]),
         "mktThisWeekTherapists": therapists_for_period(this_week, db_therapists, "mktThisWeekTherapists", loc_filter=["MKT"]),
         "mktLastWeekTherapists": therapists_for_period(last_week, db_therapists, "mktLastWeekTherapists", loc_filter=["MKT"]),
+        "mktLastMonthTherapists": therapists_for_period(last_month, db_therapists, "mktLastMonthTherapists", loc_filter=["MKT"]),
         "testYtdTherapists": therapists_for_period(this_year, db_therapists, "testYtdTherapists", loc_filter=["Testing"]),
         "testLyTherapists": therapists_for_period(last_year, db_therapists, "testLyTherapists", loc_filter=["Testing"]),
         "testThisMonthTherapists": therapists_for_period(this_month, db_therapists, "testThisMonthTherapists", loc_filter=["Testing"]),
         "testThisWeekTherapists": therapists_for_period(this_week, db_therapists, "testThisWeekTherapists", loc_filter=["Testing"]),
         "testLastWeekTherapists": therapists_for_period(last_week, db_therapists, "testLastWeekTherapists", loc_filter=["Testing"]),
+        "testLastMonthTherapists": therapists_for_period(last_month, db_therapists, "testLastMonthTherapists", loc_filter=["Testing"]),
     }
 
 

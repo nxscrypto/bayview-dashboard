@@ -533,7 +533,7 @@ function BayviewDashboard() {
 
   // Cumulative for forecast
   const prev = stats.prev || null;
-  const prevLabels = { ytd: "vs last YTD", lastyear: "vs prior year", month: "vs last month", week: "vs prior week", today: "vs yesterday", all: "" };
+  const prevLabels = { ytd: "vs last YTD", lastyear: "vs prior year", month: "vs last month", lastmonth: "vs prior month", week: "vs prior week", today: "vs yesterday", all: "" };
   const prevLabel = prevLabels[timeFilter] || "";
 
   const cumulative = useMemo(() => {
@@ -584,8 +584,8 @@ function BayviewDashboard() {
         };
 
         const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", lastmonth: "lastMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists", lastweek: "lastWeekTherapists" };
-        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists", lastweek: "mktLastWeekTherapists" };
-        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists", lastweek: "testLastWeekTherapists" };
+        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", lastmonth: "mktLastMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists", lastweek: "mktLastWeekTherapists" };
+        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", lastmonth: "testLastMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists", lastweek: "testLastWeekTherapists" };
 
         const rentalTherapistMap = useMemo(() => buildTherapistMap(rentalPeriodMap[timeFilter] || "therapists", rentalPeriodMap, NAME_ALIASES), [timeFilter]);
         const mktTherapistMap = useMemo(() => buildTherapistMap(mktPeriodMap[timeFilter] || "mktTherapists", mktPeriodMap, {...NAME_ALIASES, ...MKT_ALIASES}), [timeFilter]);
