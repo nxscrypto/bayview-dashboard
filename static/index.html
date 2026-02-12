@@ -515,6 +515,7 @@ function BayviewDashboard() {
   const filterBtns = [
     { id: "ytd", label: "Year-to-Date" },
     { id: "month", label: "This Month" },
+    { id: "lastmonth", label: "Previous Month" },
     { id: "week", label: "This Week" },
     { id: "lastweek", label: "Last Week" },
     { id: "today", label: "Today" },
@@ -532,7 +533,7 @@ function BayviewDashboard() {
 
   // Cumulative for forecast
   const prev = stats.prev || null;
-  const prevLabels = { ytd: "vs last YTD", lastyear: "vs prior year", month: "vs last month", week: "vs prior week", today: "vs yesterday", all: "" };
+  const prevLabels = { ytd: "vs last YTD", lastyear: "vs prior year", month: "vs last month", lastmonth: "vs month before", week: "vs prior week", today: "vs yesterday", all: "" };
   const prevLabel = prevLabels[timeFilter] || "";
 
   const cumulative = useMemo(() => {
@@ -582,9 +583,9 @@ function BayviewDashboard() {
           return map;
         };
 
-        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists", lastweek: "lastWeekTherapists" };
-        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists", lastweek: "mktLastWeekTherapists" };
-        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists", lastweek: "testLastWeekTherapists" };
+        const rentalPeriodMap = { ytd: "ytdTherapists", month: "thisMonthTherapists", lastmonth: "lastMonthTherapists", week: "thisWeekTherapists", today: "todayTherapists", all: "therapists", lastyear: "lyTherapists", lastweek: "lastWeekTherapists" };
+        const mktPeriodMap = { ytd: "mktYtdTherapists", month: "mktThisMonthTherapists", lastmonth: "mktLastMonthTherapists", week: "mktThisWeekTherapists", today: "mktThisMonthTherapists", all: "mktTherapists", lastyear: "mktLyTherapists", lastweek: "mktLastWeekTherapists" };
+        const testPeriodMap = { ytd: "testYtdTherapists", month: "testThisMonthTherapists", lastmonth: "testLastMonthTherapists", week: "testThisWeekTherapists", today: "testThisMonthTherapists", all: "testTherapists", lastyear: "testLyTherapists", lastweek: "testLastWeekTherapists" };
 
         const rentalTherapistMap = useMemo(() => buildTherapistMap(rentalPeriodMap[timeFilter] || "therapists", rentalPeriodMap, NAME_ALIASES), [timeFilter]);
         const mktTherapistMap = useMemo(() => buildTherapistMap(mktPeriodMap[timeFilter] || "mktTherapists", mktPeriodMap, {...NAME_ALIASES, ...MKT_ALIASES}), [timeFilter]);
@@ -643,11 +644,14 @@ function BayviewDashboard() {
     const ls = new Date(mon); ls.setDate(mon.getDate() - 1);
     const ms = new Date(now.getFullYear(), now.getMonth(), 1);
     const ys = new Date(now.getFullYear(), 0, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const prevMonthStart = new Date(prevMonthEnd.getFullYear(), prevMonthEnd.getMonth(), 1);
     return {
       all: "All Data \u00b7 May 1, 2017 \u2013 " + fmtFull(now),
       ytd: "Year-to-Date \u00b7 " + fmt(ys) + " \u2013 " + fmtFull(now),
       lastyear: "Last Year \u00b7 Jan 1, " + (now.getFullYear()-1) + " \u2013 Dec 31, " + (now.getFullYear()-1),
       month: "This Month \u00b7 " + fmt(ms) + " \u2013 " + fmtFull(now),
+      lastmonth: "Previous Month \u00b7 " + fmt(prevMonthStart) + " \u2013 " + fmtFull(prevMonthEnd),
       week: "This Week \u00b7 " + fmt(mon) + " \u2013 " + fmtFull(sun),
       lastweek: "Last Week \u00b7 " + fmt(lm) + " \u2013 " + fmtFull(ls),
       today: "Today \u00b7 " + fmtFull(now),
@@ -1551,7 +1555,38 @@ return (
   {frcfLoading && <div style={{ textAlign: "center", padding: 40, color: C.muted }}>Loading FRCF data...</div>}
 
               {!frcfLoading && frcfData && (() => {
-                    const sessions = frcfData.sessions || [];
+                    const allFrcfSessions = frcfData.sessions || [];
+                // Filter FRCF sessions by selected time filter
+                const sessions = (() => {
+                  if (timeFilter === "all") return allFrcfSessions;
+                  const now = new Date();
+                  const td = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                  return allFrcfSessions.filter(s => {
+                    const d = new Date(s.session_date);
+                    if (isNaN(d.getTime())) return false;
+                    if (timeFilter === "ytd") return d >= new Date(td.getFullYear(), 0, 1) && d <= td;
+                    if (timeFilter === "month") return d >= new Date(td.getFullYear(), td.getMonth(), 1) && d <= td;
+                    if (timeFilter === "lastmonth") {
+                      const pe = new Date(td.getFullYear(), td.getMonth(), 0);
+                      return d >= new Date(pe.getFullYear(), pe.getMonth(), 1) && d <= pe;
+                    }
+                    if (timeFilter === "week") {
+                      const dow = td.getDay();
+                      const ws = new Date(td); ws.setDate(td.getDate() - ((dow + 6) % 7));
+                      return d >= ws && d <= td;
+                    }
+                    if (timeFilter === "lastweek") {
+                      const dow = td.getDay();
+                      const thisMon = new Date(td); thisMon.setDate(td.getDate() - ((dow + 6) % 7));
+                      const lastMon = new Date(thisMon); lastMon.setDate(thisMon.getDate() - 7);
+                      const lastSun = new Date(thisMon); lastSun.setDate(thisMon.getDate() - 1);
+                      return d >= lastMon && d <= lastSun;
+                    }
+                    if (timeFilter === "today") return d.getFullYear() === td.getFullYear() && d.getMonth() === td.getMonth() && d.getDate() === td.getDate();
+                    if (timeFilter === "lastyear") return d >= new Date(td.getFullYear() - 1, 0, 1) && d <= new Date(td.getFullYear() - 1, 11, 31);
+                    return true;
+                  });
+                })();
                 const totalSessions = sessions.length;
 
                 // Sessions by location
@@ -1773,7 +1808,7 @@ return (
               return rows;
             })();
             const periods = { ytd: R.ytd, lastYear: R.lastYear, allTime: R.allTime, thisMonth: R.thisMonth, lastMonth: R.lastMonth, thisWeek: R.thisWeek, lastWeek: R.lastWeek, today: R.today };
-            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", week: "thisWeek", today: "today", all: "allTime", lastyear: "lastYear", lastweek: "lastWeek" };
+            const rentalPeriodMap = { ytd: "ytd", month: "thisMonth", lastmonth: "lastMonth", week: "thisWeek", today: "today", all: "allTime", lastyear: "lastYear", lastweek: "lastWeek" };
             const rentalPeriod = rentalPeriodMap[timeFilter] || "ytd";
           const rp = periods[rentalPeriod] || R.allTime || {};
           const rpTherapists = rentalPeriod === "ytd" ? R.ytdTherapists : rentalPeriod === "lastYear" ? R.lyTherapists : rentalPeriod === "thisMonth" ? R.thisMonthTherapists : rentalPeriod === "lastWeek" ? R.lastWeekTherapists : R.therapists;
