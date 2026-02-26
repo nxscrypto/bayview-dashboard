@@ -16,7 +16,7 @@ CALENDARS = {
 ET = pytz.timezone("America/New_York")
 
 ROOM_KEYWORDS = {
-    "empower", "dream", "conf", "renew", "inspire", "harmony",
+    "empower", "dream", "conf", "cof", "renew", "inspire", "harmony",
     "serenity", "cs", "ftl", "pl", "maint", "maintenance",
     "conference", "group", "office", "room", "testing",
 }
@@ -120,11 +120,35 @@ def fetch_calendar_events(calendar_id, time_min, time_max):
                     continue
             except Exception:
                 continue
+            # Parse end time for duration calculation
+            end_info = item.get("end", {})
+            end_dt_str = end_info.get("dateTime") or end_info.get("date")
+            end_dt = None
+            if end_dt_str and "T" in end_dt_str:
+                try:
+                    end_dt = datetime.fromisoformat(end_dt_str)
+                    if end_dt.tzinfo is None:
+                        end_dt = ET.localize(end_dt)
+                    else:
+                        end_dt = end_dt.astimezone(ET)
+                except Exception:
+                    end_dt = None
+
+            # Calculate session count based on duration
+            # 30 min = 0.5, 60 min = 1.0, 90 min = 1.5, etc.
+            if end_dt:
+                duration_minutes = (end_dt - start_dt).total_seconds() / 60
+                session_count = duration_minutes / 60.0
+            else:
+                session_count = 1.0
+
             events.append({
                 "summary": summary,
                 "start": start_dt,
+                "end": end_dt,
                 "date": start_dt.date(),
                 "day_of_week": start_dt.weekday(),
+                "session_count": session_count,
             })
         page_token = data.get("nextPageToken")
         if not page_token:
@@ -155,12 +179,12 @@ def get_sessions_data(weeks_back=8):
                 e for e in all_events.get(location, [])
                 if week_start <= e["date"] <= week_end
             ]
-            therapist_sessions = defaultdict(lambda: [0, 0, 0, 0, 0, 0, 0])
+            therapist_sessions = defaultdict(lambda: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
             for event in week_events:
                 name = extract_therapist_name(event["summary"])
                 if name:
                     dow = event["day_of_week"]
-                    therapist_sessions[name][dow] += 1
+                    therapist_sessions[name][dow] += event.get("session_count", 1.0)
             rows = []
             for name in sorted(therapist_sessions.keys()):
                 days = therapist_sessions[name]
