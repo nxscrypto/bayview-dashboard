@@ -15,10 +15,12 @@ CALENDARS = {
 
 ET = pytz.timezone("America/New_York")
 
+# All room names used at Bayview locations
 ROOM_KEYWORDS = {
     "empower", "dream", "conf", "cof", "renew", "inspire", "harmony",
-    "serenity", "cs", "ftl", "pl", "maint", "maintenance",
-    "conference", "group", "office", "room", "testing",
+    "serenity", "tranquil", "hope", "conference",
+    "cs", "ftl", "pl", "maint", "maintenance",
+    "group", "office", "room", "testing",
 }
 
 SKIP_PATTERNS = [
@@ -29,37 +31,154 @@ SKIP_PATTERNS = [
     r"orientation", r"training",
 ]
 
+# Extra words to strip from names (not therapist names)
+STRIP_WORDS = {
+    "new", "sean's", "daughter", "son", "wife", "husband",
+    "client", "session", "appointment", "eval", "evaluation",
+    "intake", "consult", "consultation",
+}
+
 
 def extract_therapist_name(summary):
+    """Extract just the therapist first name (+ optional initial) from a calendar summary."""
     if not summary:
         return None
     s = summary.strip()
+
+    # Skip non-session entries
     for pattern in SKIP_PATTERNS:
         if re.search(pattern, s, re.IGNORECASE):
             return None
+
+    # Strip asterisks and trailing punctuation
+    s = re.sub(r'\*+', '', s).strip()
+
     parts = s.split()
     if not parts:
         return None
+
     name_parts = []
     for part in parts:
         cleaned = part.strip().lower().rstrip(".,;:")
         if cleaned in ROOM_KEYWORDS:
             continue
+        if cleaned in STRIP_WORDS:
+            continue
         name_parts.append(part)
+
     if not name_parts:
         return None
+
     name = " ".join(name_parts).strip()
+
+    # Normalize "Dr." prefix
     name = re.sub(r"(?i)^dr\.?\s+", "Dr. ", name)
+
+    # Capitalize properly
     final_parts = []
     for p in name.split():
         if p.startswith("Dr."):
             final_parts.append(p)
+        elif p == "d" or p == "D":
+            # Single letter initial like "Heather d" → "Heather D"
+            final_parts.append(p.upper())
+        elif p == "g" or p == "G":
+            final_parts.append(p.upper())
+        elif p == "s" or p == "S":
+            final_parts.append(p.upper())
+        elif "'" in p:
+            # Handle names like J'nay
+            final_parts.append(p[0].upper() + p[1:])
         else:
             final_parts.append(p.capitalize())
     name = " ".join(final_parts)
+
     if not name or len(name) < 2:
         return None
+
     return name
+
+
+# Canonical name mapping: normalize variants to a single name
+# Key = lowercase normalized form, Value = display name
+# Built from frequency analysis — most common form wins
+CANONICAL_NAMES = {}
+
+
+def _normalize_key(name):
+    """Create a lookup key for deduplication."""
+    return re.sub(r'\s+', ' ', name.strip().lower())
+
+
+def resolve_name(name, name_counts):
+    """
+    Resolve a therapist name to its canonical form.
+    Uses the most frequent variant as the canonical name.
+    Merges names that share the same first name (and optional initial).
+    """
+    key = _normalize_key(name)
+    if key in CANONICAL_NAMES:
+        return CANONICAL_NAMES[key]
+    return name
+
+
+def build_canonical_map(all_names):
+    """
+    Given a dict of {name: count}, build canonical name mappings.
+    Group by first name (+ optional single-letter initial).
+    The most frequent variant becomes canonical.
+    """
+    # Group names by their "base" (first word, lowercased)
+    groups = defaultdict(list)
+    for name, count in all_names.items():
+        key = _normalize_key(name)
+        parts = key.split()
+        if not parts:
+            continue
+
+        # Base key: first name + optional single-char initial
+        base = parts[0]
+        if len(parts) > 1 and len(parts[1]) == 1:
+            base = f"{parts[0]} {parts[1]}"
+
+        # Special: "dr." prefix → "dr. firstname"
+        if base == "dr." and len(parts) > 1:
+            base = f"dr. {parts[1]}"
+            if len(parts) > 2 and len(parts[2]) == 1:
+                base = f"dr. {parts[1]} {parts[2]}"
+
+        groups[base].append((name, count))
+
+    # For each group, pick the most frequent as canonical
+    for base, variants in groups.items():
+        # Sort by count desc, then by shortest name (prefer clean names)
+        variants.sort(key=lambda x: (-x[1], len(x[0])))
+        canonical = variants[0][0]
+        for name, _ in variants:
+            CANONICAL_NAMES[_normalize_key(name)] = canonical
+
+
+def merge_therapist_sessions(therapist_sessions):
+    """
+    Merge sessions for therapists whose names resolve to the same canonical form.
+    Returns a new dict with canonical names as keys.
+    """
+    # First build frequency map from current data
+    name_counts = {}
+    for name, days in therapist_sessions.items():
+        name_counts[name] = name_counts.get(name, 0) + sum(days)
+
+    # Build/update canonical map
+    build_canonical_map(name_counts)
+
+    # Merge sessions under canonical names
+    merged = defaultdict(lambda: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    for name, days in therapist_sessions.items():
+        canonical = resolve_name(name, name_counts)
+        for i in range(7):
+            merged[canonical][i] += days[i]
+
+    return merged
 
 
 def get_week_bounds(date=None):
@@ -78,6 +197,7 @@ def get_weeks_in_range(start_date, end_date):
         weeks.append((current_monday, sunday))
         current_monday += timedelta(days=7)
     return weeks
+
 
 def fetch_calendar_events(calendar_id, time_min, time_max):
     url = f"https://www.googleapis.com/calendar/v3/calendars/{calendar_id}/events"
@@ -155,6 +275,7 @@ def fetch_calendar_events(calendar_id, time_min, time_max):
             break
     return events
 
+
 def get_sessions_data(weeks_back=8):
     now = datetime.now(ET)
     today = now.date()
@@ -167,6 +288,18 @@ def get_sessions_data(weeks_back=8):
     for location, cal_id in CALENDARS.items():
         events = fetch_calendar_events(cal_id, time_min, time_max)
         all_events[location] = events
+
+    # First pass: collect ALL names across all weeks/locations for frequency analysis
+    global_name_counts = defaultdict(int)
+    for location in CALENDARS:
+        for event in all_events.get(location, []):
+            name = extract_therapist_name(event["summary"])
+            if name:
+                global_name_counts[name] += 1
+
+    # Build canonical name map from global frequencies
+    build_canonical_map(global_name_counts)
+
     weeks = get_weeks_in_range(start_monday, current_sunday)
     weeks_data = []
     therapist_grand_totals = defaultdict(lambda: {"total": 0, "by_location": defaultdict(int)})
@@ -183,8 +316,11 @@ def get_sessions_data(weeks_back=8):
             for event in week_events:
                 name = extract_therapist_name(event["summary"])
                 if name:
+                    # Resolve to canonical name immediately
+                    canonical = resolve_name(name, global_name_counts)
                     dow = event["day_of_week"]
-                    therapist_sessions[name][dow] += event.get("session_count", 1.0)
+                    therapist_sessions[canonical][dow] += event.get("session_count", 1.0)
+
             rows = []
             for name in sorted(therapist_sessions.keys()):
                 days = therapist_sessions[name]
