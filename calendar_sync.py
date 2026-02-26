@@ -50,8 +50,10 @@ def extract_therapist_name(summary):
         if re.search(pattern, s, re.IGNORECASE):
             return None
 
-    # Strip asterisks and trailing punctuation
-    s = re.sub(r'\*+', '', s).strip()
+    # Strip asterisks, plus signs, and trailing punctuation
+    s = re.sub(r'[\*\+]+', '', s).strip()
+    # Normalize unicode apostrophes to regular apostrophe
+    s = s.replace('\u2018', "'").replace('\u2019', "'").replace('\u0060', "'").replace('\u00b4', "'")
 
     parts = s.split()
     if not parts:
