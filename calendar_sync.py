@@ -25,10 +25,15 @@ ROOM_KEYWORDS = {
 
 SKIP_PATTERNS = [
     r"best air", r"maintenance", r"maint\b", r"lunch", r"break",
-    r"meeting", r"staff", r"closed", r"holiday", r"off\b",
+    r"meeting", r"staff", r"closed", r"holiday",
     r"block", r"hold", r"cancel", r"no session", r"note\b",
     r"reminder", r"admin", r"cleaning", r"interview",
     r"orientation", r"training",
+]
+
+# Vacation patterns — these events pass through to the API (so frontend can show banners)
+# but the frontend excludes them from session counts
+VACAY_PATTERNS = [
     r"vacay", r"vacation", r"vaca\b", r"pto\b", r"out of office",
 ]
 
