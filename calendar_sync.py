@@ -29,6 +29,7 @@ SKIP_PATTERNS = [
     r"block", r"hold", r"cancel", r"no session", r"note\b",
     r"reminder", r"admin", r"cleaning", r"interview",
     r"orientation", r"training",
+    r"vacay", r"vacation", r"vaca\b", r"pto\b", r"out of office",
 ]
 
 # Extra words to strip from names (not therapist names)
