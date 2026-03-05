@@ -34,7 +34,7 @@ SKIP_PATTERNS = [
 # Vacation patterns — these events pass through to the API (so frontend can show banners)
 # but the frontend excludes them from session counts
 VACAY_PATTERNS = [
-    r"vacay", r"vacation", r"vaca\b", r"pto\b", r"out of office",
+    r"vacay", r"vacation", r"vaca\b", r"pto\b", r"out of office", r"\boff\b",
 ]
 
 # Extra words to strip from names (not therapist names)
@@ -53,6 +53,11 @@ def extract_therapist_name(summary):
 
     # Skip non-session entries
     for pattern in SKIP_PATTERNS:
+        if re.search(pattern, s, re.IGNORECASE):
+            return None
+
+    # Skip vacation entries (not real sessions)
+    for pattern in VACAY_PATTERNS:
         if re.search(pattern, s, re.IGNORECASE):
             return None
 
