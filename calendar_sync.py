@@ -115,7 +115,13 @@ def extract_therapist_name(summary):
 # Canonical name mapping: normalize variants to a single name
 # Key = lowercase normalized form, Value = display name
 # Built from frequency analysis — most common form wins
-CANONICAL_NAMES = {}
+# Pre-seed with known misspellings
+CANONICAL_NAMES = {
+    "jonthan": "Jonathan",
+    "jonthan s": "Jonathan",
+    "jonthan s.": "Jonathan",
+    "jonthan stiglich": "Jonathan Stiglich",
+}
 
 
 def _normalize_key(name):
